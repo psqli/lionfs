@@ -1,0 +1,1 @@
+#define MAX_CACHEREQUESTS 32
