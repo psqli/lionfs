@@ -1,2 +1,11 @@
-This is a test with the fuse library to create a simple filesystem.
-Possibily lionfs (LInk Over Network File System)
+Based on ghostfs by Raphael Carvalho.
+
+# It's not ready yet ...
+
+There are many things to do before lionfs be released.
+
+# lionfs (Link Over Network File System)
+
+Use `ln -s http://website/file.txt local_file` and you will have a local file
+that points to a network file. It is our purpose.
+

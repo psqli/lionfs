@@ -1,4 +1,4 @@
-
+#include <stdio.h>
 
 typedef struct
 {
@@ -17,8 +17,4 @@ typedef struct
 } _filelist_t;
 
 #define MAX_FILES 16
-
-inline int8_t
-get_binfo(int fid);
-
 

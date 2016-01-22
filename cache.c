@@ -32,9 +32,17 @@ cache_routine(void)
 	{
 		cacher = array_get();
 
+		if(cacher->fid < 0)
+		{
+			DEBUG("Cache Manager is going down.");
+			free(cacher);
+			return NULL;
+		}
+
 		if(get_binfo(cacher->fid)[cacher->offset] == 1)
 		{
 			DEBUG("FATAL: replacing block %d", cacher->offset);
+			DEBUG("  At the moment we do not support replaces");
 			free(cacher);
 			return NULL;
 		}
@@ -72,9 +80,10 @@ cache_data_insert(int fid, void *data, size_t length, off_t offset)
 	return 0;
 }
 
-void*
-cache_data_request(int fid, off_t offset)
-{}
+ssize_t
+cache_data_request(int fid, void *data, off_t offset)
+{
+}
 
 int
 cache_reset(int fid, size_t blocks)

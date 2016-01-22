@@ -12,8 +12,10 @@
 #include <fuse.h>
 
 #undef ALIGN_LAST_FIRST
+#define ARRAY_ALIGN
+#define ARRAY_LINKUNLINK
 
-#include "lonfs.h"
+#include "lionfs.h"
 #include "array.h"
 
 /*
@@ -21,22 +23,6 @@
  * nodeids 2 v 4 v 6 v 8 ... are symlinks
  * nodeids   3 ^ 5 ^ 7 ^ 9 ... are fakefiles
  */
-
-typedef struct
-{
-	char *path;
-	char *url;
-	size_t size;
-	mode_t mode;
-	int8_t *binfo;
-} _file_t;
-
-typedef struct
-{
-	size_t count;
-	_file_t **file; /* probabily will be implemented with The Opencall
-	Array Manager */
-} _filelist_t;
 
 _filelist_t filelist = { 0, };
 
@@ -113,12 +99,12 @@ remove_fid(int fid)
 	
 	file = filelist.file[fid];
 
-	free(file->path);
-	free(file->url);
-
-	array_object_del((Array) filelist.file, fid);
+	array_object_unlink((Array) filelist.file, fid);
 
 	filelist.count--;
+
+	free(file->path);
+	free(file->url);
 
 	return 0;
 }
@@ -128,12 +114,10 @@ add_fid(const char *path, const char *url, mode_t mode)
 {
 	_file_t *file;
 
-	file = array_object_new((Array) filelist.file, sizeof(_file_t));
+	file = malloc(sizeof(_file_t));
 
 	if(file == NULL)
 		return -1;
-
-	filelist.count++;
 
 	/* we need allocate first */
 	file->path = malloc(strlen(path) + 1);
@@ -143,6 +127,10 @@ add_fid(const char *path, const char *url, mode_t mode)
 	strcpy(file->url, url);
 	file->mode = mode;
 	file->size = 13;
+
+	array_object_link((Array) filelist.file, file, sizeof(_file_t));
+
+	filelist.count++;
 
 	return 0;
 }
