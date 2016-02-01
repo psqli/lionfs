@@ -1,3 +1,22 @@
+/*
+ * lionfs, The Link Over Network File System
+ * Copyright (C) 2016  Ricardo Biehl Pasquali <rbpoficial@gmail.com>
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program; if not, write to the Free Software
+ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+ */
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <errno.h>
@@ -12,16 +31,23 @@
 #include <fuse.h>
 
 #undef ALIGN_LAST_FIRST
-#define ARRAY_ALIGN
-#define ARRAY_LINKUNLINK
 
 #include "lionfs.h"
+#include "network.h"
 #include "array.h"
 
 /*
+ * TODO It's not working!
+ * Create nodeids for fakefiles after symlink have been created.
  * nodeid 1 is "/"
  * nodeids 2 v 4 v 6 v 8 ... are symlinks
  * nodeids   3 ^ 5 ^ 7 ^ 9 ... are fakefiles
+ */
+
+/* TODO
+ * # Put fakefiles in a fake directory `.ff/`
+ *   Example: `readlink music.mp3` -> .ff/music.mp3
+ * # No nodeids for fakefiles.
  */
 
 _filelist_t filelist = { 0, };
@@ -37,8 +63,14 @@ set_binfo(int fid, int8_t *binfo)
 {
 	if(binfo == NULL)
 		return -1;
-	(filelist.file[fid])->binfo = binfo;	
+	(filelist.file[fid])->binfo = binfo;
 	return 0;
+}
+
+inline time_t
+get_mtime(int fid)
+{
+	return (filelist.file[fid])->mtime;
 }
 
 inline mode_t
@@ -47,7 +79,7 @@ get_mode(int fid)
 	return (filelist.file[fid])->mode;
 }
 
-inline size_t
+inline long long
 get_size(int fid)
 {
 	return (filelist.file[fid])->size;
@@ -93,6 +125,24 @@ get_fid_by_url(const char *url)
 }
 
 int
+string_to_fid(const char *string)
+{
+	int fid;
+	char *endptr;
+
+	fid = strtol(string, &endptr, 10);
+
+	if((endptr - string) != 2)
+		return -1;
+	if(fid < 0 || fid > (filelist.count - 1))
+		return -1;
+	if(filelist.file[fid] == NULL)
+		return -1;
+
+	return fid;
+}
+
+int
 remove_fid(int fid)
 {
 	_file_t *file;
@@ -106,6 +156,8 @@ remove_fid(int fid)
 	free(file->path);
 	free(file->url);
 
+	array_object_free(file);
+
 	return 0;
 }
 
@@ -114,21 +166,22 @@ add_fid(const char *path, const char *url, mode_t mode)
 {
 	_file_t *file;
 
-	file = malloc(sizeof(_file_t));
+	file = array_object_alloc(sizeof(_file_t));
 
 	if(file == NULL)
 		return -1;
 
-	/* we need allocate first */
 	file->path = malloc(strlen(path) + 1);
 	file->url = malloc(strlen(url) + 1);
 
 	strcpy(file->path, path);
 	strcpy(file->url, url);
-	file->mode = mode;
-	file->size = 13;
 
-	array_object_link((Array) filelist.file, file, sizeof(_file_t));
+	file->mode = mode;
+
+	network_file_get_info(file->url, file);
+
+	array_object_link((Array) filelist.file, file);
 
 	filelist.count++;
 
@@ -142,11 +195,9 @@ rename_fid(int fid, const char *path)
 }
 
 int
-fs_getattr(const char *path, struct stat *buf)
+lion_getattr(const char *path, struct stat *buf)
 {
 	int fid;
-
-	char *endptr;
 
 	memset(buf, 0, sizeof(struct stat));
 
@@ -156,71 +207,73 @@ fs_getattr(const char *path, struct stat *buf)
 		buf->st_nlink = 2;
 		return 0;
 	}
+#if 0
+/*for TODO above */
+	if(strcmp(path, "/.ff") == 0)
+	{
+		buf->st_mode = S_IFDIR | 0444;
+		buf->st_nlink = 1;
+		return 0;
+	}
 
+	if(strcmp(path, "/.ff/") > 0)
+	{
+		/*TODO I think ready*/
+		path += 4;
+
+		fid = get_fid_by_path(path);
+
+		if(fid < 0)
+			return -ENOENT;
+
+		buf->st_mode = S_IFREG | 0444;
+		buf->st_size = get_size(fid);
+		buf->st_mtime = get_mtime(fid);
+		buf->st_ino = 0;
+		buf->st_nlink = 0;
+
+		return 0;
+	}
+#endif
 	fid = get_fid_by_path(path);
 
 	if(fid < 0)
 	{
-		fid = strtol(path + 1, &endptr, 10);
-		if((endptr - (path + 1)) != 2)
-			return -ENOENT;
-		if(fid < 0 || fid > (filelist.count - 1))
-			return -ENOENT;
-		if(filelist.file[fid] == NULL)
+		if((fid = string_to_fid(path + 1)) < 0)
 			return -ENOENT;
 		buf->st_mode = S_IFREG | 0444;
 		buf->st_size = get_size(fid);
+		buf->st_mtime = get_mtime(fid);
+		buf->st_ino = 0;
 		buf->st_nlink = 0;
 		return 0;
 	}
 
 	buf->st_mode = get_mode(fid);
 	buf->st_size = get_size(fid);
+	buf->st_mtime = get_mtime(fid);
 	buf->st_nlink = 1;
 
 	return 0;
 }
 
 int
-fs_readlink(const char *path, char *buf, size_t len)
+lion_readlink(const char *path, char *buf, size_t len)
 {
 	int fid;
 
-	char *endptr;
-#if 0
-	char *url;
-	size_t urllen;
-#endif
 	fid = get_fid_by_path(path);
 
 	if(fid < 0)
-	{
-		fid = strtol(path + 1, &endptr, 10);
-		if((endptr - (path + 1)) != 2)
-			return -ENOENT;
-		if(fid < 0 || fid > (filelist.count - 1))
-			return -ENOENT;
-		if(filelist.file[fid] == NULL)
-			return -ENOENT;
-		sprintf(buf, "%s", get_url(fid));
-		return 0;
-	}
+		return -ENOENT;
 
 	sprintf(buf, "%.2d", fid);
-#if 0
-	url = get_url(fid);
-	urllen = strlen(url) + 1;
 
-	if(urllen > len)
-		return -EINVAL;
-
-	strcpy(buf, url);
-#endif
 	return 0;
 }
 
 int
-fs_unlink(const char *path)
+lion_unlink(const char *path)
 {
 	int fid;
 
@@ -235,12 +288,15 @@ fs_unlink(const char *path)
 }
 
 int
-fs_symlink(const char *linkname, const char *path)
+lion_symlink(const char *linkname, const char *path)
 {
 	int fid;
 
-	if(get_fid_by_path(linkname) >= 0)
+	if(get_fid_by_path(path) >= 0)
 		return -EEXIST;
+
+	if(network_file_get_valid((char*) linkname))
+		return -EHOSTUNREACH;
 
 	fid = add_fid(path, linkname, S_IFLNK | 0444);
 
@@ -251,8 +307,10 @@ fs_symlink(const char *linkname, const char *path)
 }
 
 int
-fs_rename(const char *oldpath, const char *newpath)
+lion_rename(const char *oldpath, const char *newpath)
 {
+	return -ENOSYS; /*TODO*/
+
 	int fid;
 
 	fid = get_fid_by_path(oldpath);
@@ -266,33 +324,32 @@ fs_rename(const char *oldpath, const char *newpath)
 }
 
 int
-fs_read(const char *path, char *buf, size_t size, off_t off,
+lion_read(const char *path, char *buf, size_t size, off_t off,
 	struct fuse_file_info *fi)
 {
 	int fid;
 
-	char *endptr;
-
-	int i;
-
-	fid = strtol(path + 1, &endptr, 10);
-	if((endptr - (path + 1)) != 2)
+	if((fid = string_to_fid(path + 1)) < 0)
 		return -ENOENT;
-	if(fid < 0 || fid > (filelist.count - 1))
+#if 0
+	/* TODO */
+	if((fid = get_fid_by_ff(path)) < 0)
 		return -ENOENT;
-	if(filelist.file[fid] == NULL)
-		return -ENOENT;
+#endif
 
-	for(i = 0; i < size; i++)
+	if(off < get_size(fid))
 	{
-		buf[i] = 'A';
+		if(off + size > get_size(fid))
+			size = get_size(fid) - off;
 	}
+	else
+		return 0;
 
-	return size;
+	return network_file_get_data(get_url(fid), size, off, buf);
 }
 
 int
-fs_readdir(const char *path, void *buf, fuse_fill_dir_t filler, off_t off,
+lion_readdir(const char *path, void *buf, fuse_fill_dir_t filler, off_t off,
 	struct fuse_file_info *fi)
 {
 	if(strcmp(path, "/") != 0)
@@ -312,24 +369,35 @@ fs_readdir(const char *path, void *buf, fuse_fill_dir_t filler, off_t off,
 
 struct fuse_operations fuseopr =
 {
-	.getattr = fs_getattr,
-	.readlink = fs_readlink,
-	.unlink = fs_unlink,
-	.symlink = fs_symlink,
-	.rename = fs_rename,
-	.read = fs_read,
-	.readdir = fs_readdir,
+	.getattr = lion_getattr,
+	.readlink = lion_readlink,
+	.unlink = lion_unlink,
+	.symlink = lion_symlink,
+	.rename = lion_rename,
+	.read = lion_read,
+	.readdir = lion_readdir,
 };
 
 int
 main(int argc, char **argv)
 {
+	int ret = 0;
+
 	if((filelist.file = (_file_t**) array_new(MAX_FILES)) == NULL)
-		return 1;	
+		return 1;
+
+	if(network_open_module("http") == -1)
+	{
+		ret = 1;
+		goto _go_free;
+	}
 
 	fuse_main(argc, argv, &fuseopr, NULL);
 
+	// network_close_module(); TODO do not working!
+
+_go_free:
 	array_del((Array) filelist.file);
 
-	return 0;
+	return ret;
 }

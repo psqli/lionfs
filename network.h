@@ -17,23 +17,20 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
-#include <sys/types.h>
+size_t
+network_file_get_data(char*, size_t, long long, void*);
 
-typedef struct
-{
-	char *path;
-	char *url;
-	long long size;
-	mode_t mode;
-	time_t mtime; /* Last Modified */
-	int8_t *binfo;
-} _file_t;
+long long
+network_file_get_length(char*);
 
-typedef struct
-{
-	size_t count;
-	_file_t **file; /* Implemented with The Opencall Array Manager */
-} _filelist_t;
+int
+network_file_get_valid(char*);
 
-#define MAX_FILES 16
+int
+network_file_get_info(char*, _file_t*);
 
+int
+network_open_module(const char*);
+
+void
+network_close_module(void);

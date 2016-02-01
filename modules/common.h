@@ -17,23 +17,10 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
-#include <sys/types.h>
+#include <time.h>
 
 typedef struct
 {
-	char *path;
-	char *url;
 	long long size;
-	mode_t mode;
-	time_t mtime; /* Last Modified */
-	int8_t *binfo;
-} _file_t;
-
-typedef struct
-{
-	size_t count;
-	_file_t **file; /* Implemented with The Opencall Array Manager */
-} _filelist_t;
-
-#define MAX_FILES 16
-
+	time_t mtime;
+} _info_t;
