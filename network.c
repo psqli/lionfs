@@ -22,7 +22,6 @@
 #include <dlfcn.h>
 
 #include "lionfs.h"
-#include "network.h"
 #include "modules/common.h"
 
 struct nmodule

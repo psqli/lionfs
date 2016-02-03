@@ -30,8 +30,6 @@
 
 #include <fuse.h>
 
-#undef ALIGN_LAST_FIRST
-
 #include "lionfs.h"
 #include "network.h"
 #include "array.h"
@@ -208,7 +206,7 @@ lion_getattr(const char *path, struct stat *buf)
 		return 0;
 	}
 #if 0
-/*for TODO above */
+/* see TODO above */
 	if(strcmp(path, "/.ff") == 0)
 	{
 		buf->st_mode = S_IFDIR | 0444;

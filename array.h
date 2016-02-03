@@ -51,12 +51,6 @@ size_t
 array_get_size(Array);
 
 /* object specific functions */
-void*
-array_object_new(Array, size_t);
-
-int
-array_object_del(Array, ArrayPosition);
-
 int
 array_object_link(Array, void*);
 

@@ -1,0 +1,34 @@
+	The fields are: name (N), email (E), and description (D).
+
+libghttp:
+
+N: Christopher Blizzard
+E: blizzard@redhat.com
+
+N: Frederic Devernay
+E: devernay@istar.fr
+
+N: Heath Martin
+E: martinh@pegasus.cc.ucf.edu
+
+N: James Henstridge
+E: james@daa.com.au
+
+N: Justin Maurer
+E: justin@debian.org
+
+N: Robert Richardson
+E: robert.richardson@edgeint.com.au
+
+N: Tue Wennerberg
+E: tue@nybro.dk
+
+lionfs:
+
+N: Raphael S. Carvalho
+E: raphael.scarv@gmail.com
+D: It's his own idea. Help everything.
+
+N: Ricardo Biehl Pasquali
+E: rbpoficial@gmail.com
+D: Developer of lionfs core and http module.
