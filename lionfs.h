@@ -32,8 +32,7 @@ typedef struct
 typedef struct
 {
 	size_t count;
-	_file_t **file; /* Implemented with The Opencall Array Manager */
+	_file_t **file;
 } _filelist_t;
 
 #define MAX_FILES 16
-

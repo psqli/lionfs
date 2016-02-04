@@ -300,8 +300,7 @@ array_object_unlink(Array array, ArrayPosition array_position)
 }
 
 /**
- * array_object_change() Change two objects in array. It uses `object_change()`
- * or `object_move()` to do the movement.
+ * array_object_change() Change two objects in array.
  *
  * @p array The array.
  * @p array_position_a Position A.

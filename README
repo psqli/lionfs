@@ -8,4 +8,3 @@ There are many things to do before lionfs be released.
 
 Use `ln -s http://website/file.txt local_file` and you will have a local file
 that points to a network file. It is our purpose.
-
