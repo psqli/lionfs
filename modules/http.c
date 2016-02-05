@@ -21,7 +21,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include <ghttp.h>
+#include "../lib/libghttp/ghttp.h"
 
 #include "common.h"
 
