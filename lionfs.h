@@ -26,7 +26,6 @@ typedef struct
 	long long size;
 	mode_t mode;
 	time_t mtime; /* Last Modified */
-	int8_t *binfo;
 } _file_t;
 
 typedef struct

@@ -50,21 +50,6 @@
 
 _filelist_t filelist = { 0, };
 
-inline int8_t*
-get_binfo(int fid)
-{
-	return (filelist.file[fid])->binfo;
-}
-
-inline int
-set_binfo(int fid, int8_t *binfo)
-{
-	if(binfo == NULL)
-		return -1;
-	(filelist.file[fid])->binfo = binfo;
-	return 0;
-}
-
 inline time_t
 get_mtime(int fid)
 {
