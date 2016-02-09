@@ -47,6 +47,10 @@ the program in the source directory. HTTP module is default searched in
 `./modules/http` defined in `network.c`, if you want to put it in another
 directory change this location.
 
+	Supported protocols:
+
+Only HTTP
+
 ----------
 
 Any contribution is welcome :-)
