@@ -43,7 +43,7 @@
  */
 
 /* TODO
- * # Put fakefiles in a fake directory `.ff/`
+ * #OK Put fakefiles in a fake directory `.ff/`
  *   Example: `readlink music.mp3` -> .ff/music.mp3
  * # No nodeids for fakefiles.
  */
@@ -108,21 +108,15 @@ get_fid_by_url(const char *url)
 }
 
 int
-string_to_fid(const char *string)
+get_fid_by_ff(const char *path)
 {
-	int fid;
-	char *endptr;
+	if(strncmp(path, "/.ff/", 5) == 0) /* NOTE is it the best way? */
+	{
+		path += 4;
+		return get_fid_by_path(path);
+	}
 
-	fid = strtol(string, &endptr, 10);
-
-	if((endptr - string) != 2)
-		return -1;
-	if(fid < 0 || fid > (filelist.count - 1))
-		return -1;
-	if(filelist.file[fid] == NULL)
-		return -1;
-
-	return fid;
+	return -1;
 }
 
 int
@@ -190,8 +184,7 @@ lion_getattr(const char *path, struct stat *buf)
 		buf->st_nlink = 2;
 		return 0;
 	}
-#if 0
-/* see TODO above */
+
 	if(strcmp(path, "/.ff") == 0)
 	{
 		buf->st_mode = S_IFDIR | 0444;
@@ -199,38 +192,19 @@ lion_getattr(const char *path, struct stat *buf)
 		return 0;
 	}
 
-	if(strcmp(path, "/.ff/") > 0)
+	if((fid = get_fid_by_ff(path)) >= 0)
 	{
-		/*TODO I think ready*/
-		path += 4;
-
-		fid = get_fid_by_path(path);
-
-		if(fid < 0)
-			return -ENOENT;
-
 		buf->st_mode = S_IFREG | 0444;
 		buf->st_size = get_size(fid);
 		buf->st_mtime = get_mtime(fid);
-		buf->st_ino = 0;
 		buf->st_nlink = 0;
-
 		return 0;
 	}
-#endif
+
 	fid = get_fid_by_path(path);
 
 	if(fid < 0)
-	{
-		if((fid = string_to_fid(path + 1)) < 0)
-			return -ENOENT;
-		buf->st_mode = S_IFREG | 0444;
-		buf->st_size = get_size(fid);
-		buf->st_mtime = get_mtime(fid);
-		buf->st_ino = 0;
-		buf->st_nlink = 0;
-		return 0;
-	}
+		return -ENOENT;
 
 	buf->st_mode = get_mode(fid);
 	buf->st_size = get_size(fid);
@@ -250,7 +224,7 @@ lion_readlink(const char *path, char *buf, size_t len)
 	if(fid < 0)
 		return -ENOENT;
 
-	sprintf(buf, "%.2d", fid);
+	sprintf(buf, ".ff/%s", get_path(fid) + 1);
 
 	return 0;
 }
@@ -312,13 +286,8 @@ lion_read(const char *path, char *buf, size_t size, off_t off,
 {
 	int fid;
 
-	if((fid = string_to_fid(path + 1)) < 0)
-		return -ENOENT;
-#if 0
-	/* TODO */
 	if((fid = get_fid_by_ff(path)) < 0)
 		return -ENOENT;
-#endif
 
 	if(off < get_size(fid))
 	{
