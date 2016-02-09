@@ -1,10 +1,6 @@
 Based on Ghost File System by Raphael S. Carvalho.
 I'm very graceful :-)
 
-* Warning!!!
-This program is not totally ready yet. In the while I recommend that you create
-only one symlink because we have some known-bugs in the nodeids.
-
 # The Lion ...
 
        ////\\\              __
