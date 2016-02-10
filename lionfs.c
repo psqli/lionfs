@@ -141,6 +141,9 @@ remove_fid(int fid)
 int
 add_fid(const char *path, const char *url, mode_t mode)
 {
+	if(filelist.count == MAX_FILES)
+		return -1;
+
 	_file_t *file;
 
 	file = array_object_alloc(sizeof(_file_t));
