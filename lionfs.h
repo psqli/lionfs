@@ -34,4 +34,4 @@ typedef struct
 	_file_t **file;
 } _filelist_t;
 
-#define MAX_FILES 16
+#define MAX_FILES 64
