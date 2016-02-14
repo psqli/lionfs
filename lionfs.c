@@ -171,7 +171,20 @@ add_fid(const char *path, const char *url, mode_t mode)
 int
 rename_fid(int fid, const char *path)
 {
-	/* TODO */
+	char **oldpath;
+	size_t new_size;
+
+	oldpath = &(filelist.file[fid])->path;
+	new_size = strlen(path) + 1;
+
+	if(new_size == 1)
+		return -1;
+
+	*oldpath = realloc(*oldpath, new_size);
+
+	memcpy(*oldpath, path, new_size);
+
+	return 0;
 }
 
 int
@@ -250,17 +263,13 @@ lion_unlink(const char *path)
 int
 lion_symlink(const char *linkname, const char *path)
 {
-	int fid;
-
 	if(get_fid_by_path(path) >= 0)
 		return -EEXIST;
 
 	if(network_file_get_valid((char*) linkname))
 		return -EHOSTUNREACH;
 
-	fid = add_fid(path, linkname, S_IFLNK | 0444);
-
-	if(fid < 0)
+	if(add_fid(path, linkname, S_IFLNK | 0444) < 0)
 		return -ENOMEM;
 
 	return 0;
@@ -269,8 +278,6 @@ lion_symlink(const char *linkname, const char *path)
 int
 lion_rename(const char *oldpath, const char *newpath)
 {
-	return -ENOSYS; /*TODO*/
-
 	int fid;
 
 	fid = get_fid_by_path(oldpath);
@@ -278,7 +285,8 @@ lion_rename(const char *oldpath, const char *newpath)
 	if(fid < 0)
 		return -ENOENT;
 
-	rename_fid(fid, newpath);
+	if(rename_fid(fid, newpath) == -1)
+		return -EINVAL;
 
 	return 0;
 }
