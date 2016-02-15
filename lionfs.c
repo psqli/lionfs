@@ -34,18 +34,6 @@
 #include "network.h"
 #include "array.h"
 
-/*
- * TODO It's not working!
- * Create nodeids for fakefiles after symlink have been created.
- * nodeid 1 is "/"
- * nodeids 2 v 4 v 6 v 8 ... are symlinks
- * nodeids   3 ^ 5 ^ 7 ^ 9 ... are fakefiles
- */
-
-/* TODO
- * # No nodeids for fakefiles.
- */
-
 _filelist_t filelist = { 0, };
 
 inline time_t
@@ -88,7 +76,8 @@ get_fid_by_path(const char *path)
 		if(strcmp(path, get_path(i)) == 0)
 			return i;
 	}
-	return -ENOENT;
+
+	return -1;
 }
 
 int
@@ -120,7 +109,7 @@ lion_getattr(const char *path, struct stat *buf)
 	if(strcmp(path, "/.ff") == 0)
 	{
 		buf->st_mode = S_IFDIR | 0444;
-		buf->st_nlink = 1;
+		buf->st_nlink = 0;
 		return 0;
 	}
 
@@ -152,7 +141,7 @@ lion_readlink(const char *path, char *buf, size_t len)
 	if((fid = get_fid_by_path(path)) < 0)
 		return -ENOENT;
 
-	sprintf(buf, ".ff/%s", get_path(fid) + 1);
+	snprintf(buf, len, ".ff/%s", get_path(fid) + 1);
 
 	return 0;
 }
