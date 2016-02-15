@@ -43,8 +43,6 @@
  */
 
 /* TODO
- * #OK Put fakefiles in a fake directory `.ff/`
- *   Example: `readlink music.mp3` -> .ff/music.mp3
  * # No nodeids for fakefiles.
  */
 
@@ -94,97 +92,15 @@ get_fid_by_path(const char *path)
 }
 
 int
-get_fid_by_url(const char *url)
-{
-	int i;
-
-	for(i = 0; i < filelist.count; i++)
-	{
-		if(strcmp(url, get_url(i)) == 0)
-			return i;
-	}
-	return -ENOENT;
-
-}
-
-int
 get_fid_by_ff(const char *path)
 {
-	if(strncmp(path, "/.ff/", 5) == 0) /* NOTE is it the best way? */
+	if(strncmp(path, "/.ff/", 5) == 0)
 	{
 		path += 4;
 		return get_fid_by_path(path);
 	}
 
 	return -1;
-}
-
-int
-remove_fid(int fid)
-{
-	_file_t *file;
-	
-	file = filelist.file[fid];
-
-	array_object_unlink((Array) filelist.file, fid);
-
-	filelist.count--;
-
-	free(file->path);
-	free(file->url);
-
-	array_object_free(file);
-
-	return 0;
-}
-
-int
-add_fid(const char *path, const char *url, mode_t mode)
-{
-	if(filelist.count == MAX_FILES)
-		return -1;
-
-	_file_t *file;
-
-	file = array_object_alloc(sizeof(_file_t));
-
-	if(file == NULL)
-		return -1;
-
-	file->path = malloc(strlen(path) + 1);
-	file->url = malloc(strlen(url) + 1);
-
-	strcpy(file->path, path);
-	strcpy(file->url, url);
-
-	file->mode = mode;
-
-	network_file_get_info(file->url, file);
-
-	array_object_link((Array) filelist.file, file);
-
-	filelist.count++;
-
-	return 0;
-}
-
-int
-rename_fid(int fid, const char *path)
-{
-	char **oldpath;
-	size_t new_size;
-
-	oldpath = &(filelist.file[fid])->path;
-	new_size = strlen(path) + 1;
-
-	if(new_size == 1)
-		return -1;
-
-	*oldpath = realloc(*oldpath, new_size);
-
-	memcpy(*oldpath, path, new_size);
-
-	return 0;
 }
 
 int
@@ -217,9 +133,7 @@ lion_getattr(const char *path, struct stat *buf)
 		return 0;
 	}
 
-	fid = get_fid_by_path(path);
-
-	if(fid < 0)
+	if((fid = get_fid_by_path(path)) < 0)
 		return -ENOENT;
 
 	buf->st_mode = get_mode(fid);
@@ -235,9 +149,7 @@ lion_readlink(const char *path, char *buf, size_t len)
 {
 	int fid;
 
-	fid = get_fid_by_path(path);
-
-	if(fid < 0)
+	if((fid = get_fid_by_path(path)) < 0)
 		return -ENOENT;
 
 	sprintf(buf, ".ff/%s", get_path(fid) + 1);
@@ -249,28 +161,57 @@ int
 lion_unlink(const char *path)
 {
 	int fid;
+	_file_t *file;
 
-	fid = get_fid_by_path(path);
-
-	if(fid < 0)
+	if((fid = get_fid_by_path(path)) < 0)
 		return -ENOENT;
 
-	remove_fid(fid);
+	file = filelist.file[fid];
+
+	array_object_unlink((Array) filelist.file, fid);
+
+	filelist.count--;
+
+	free(file->path);
+	free(file->url);
+
+	array_object_free(file);
 
 	return 0;
 }
 
 int
-lion_symlink(const char *linkname, const char *path)
+lion_symlink(const char *url, const char *path)
 {
+	_file_t *file;
+
+	if(filelist.count == MAX_FILES)
+		return -ENOMEM;
+
 	if(get_fid_by_path(path) >= 0)
 		return -EEXIST;
 
-	if(network_file_get_valid((char*) linkname))
+	if(network_file_get_valid((char*) url))
 		return -EHOSTUNREACH;
 
-	if(add_fid(path, linkname, S_IFLNK | 0444) < 0)
+	file = array_object_alloc(sizeof(_file_t));
+
+	if(file == NULL)
 		return -ENOMEM;
+
+	file->path = malloc(strlen(path) + 1);
+	file->url = malloc(strlen(url) + 1);
+
+	strcpy(file->path, path);
+	strcpy(file->url, url);
+
+	file->mode = S_IFLNK | 0444;
+
+	network_file_get_info(file->url, file);
+
+	array_object_link((Array) filelist.file, file);
+
+	filelist.count++;
 
 	return 0;
 }
@@ -279,14 +220,24 @@ int
 lion_rename(const char *oldpath, const char *newpath)
 {
 	int fid;
+	char **path_pointer;
+	size_t newsize;
 
-	fid = get_fid_by_path(oldpath);
-
-	if(fid < 0)
+	if((fid = get_fid_by_path(oldpath)) < 0)
 		return -ENOENT;
 
-	if(rename_fid(fid, newpath) == -1)
+	if(get_fid_by_path(newpath) >= 0)
+		return -EEXIST;
+
+	path_pointer = &(filelist.file[fid])->path;
+	newsize = strlen(newpath) + 1;
+
+	if(newsize == 1)
 		return -EINVAL;
+
+	*path_pointer = realloc(*path_pointer, newsize);
+
+	memcpy(*path_pointer, newpath, newsize);
 
 	return 0;
 }
@@ -315,18 +266,17 @@ int
 lion_readdir(const char *path, void *buf, fuse_fill_dir_t filler, off_t off,
 	struct fuse_file_info *fi)
 {
+	int i;
+
 	if(strcmp(path, "/") != 0)
 		return -ENOENT;
 
 	filler(buf, ".", NULL, 0);
 	filler(buf, "..", NULL, 0);
 
-	int i;
-
 	for(i = 0; i < filelist.count; i++)
-	{
 		filler(buf, get_path(i) + 1, NULL, 0);
-	}
+
 	return 0;
 }
 
