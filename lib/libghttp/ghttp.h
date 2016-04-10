@@ -22,7 +22,7 @@
 #ifndef GHTTP_H
 #define GHTTP_H
 
-#include <ghttp_constants.h>
+#include "ghttp_constants.h"
 #include <time.h>
 
 #ifdef __cplusplus
