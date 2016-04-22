@@ -1,3 +1,5 @@
+#!/bin/bash
+
 # lionfs, The Link Over Network File System
 # Copyright (C) 2016  Ricardo Biehl Pasquali <rbpoficial@gmail.com>
 #
@@ -15,8 +17,8 @@
 # along with this program; if not, write to the Free Software
 # Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
-if [ ! -x ./lionfs ]; then
-	echo "No lionfs executable binary found!"
+if [ ! -f ./lionfs -a -x ./lionfs ]; then
+	echo "No ./lionfs executable binary found!"
 	exit 1
 fi
 
