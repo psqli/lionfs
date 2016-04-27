@@ -30,6 +30,8 @@ struct nmodule
 	const char *path;
 };
 
+static void *handle;
+
 static struct nmodule modules[] =
 {
 	{"http", "modules/http"},
@@ -48,41 +50,34 @@ static int
 static int
 (*func_get_info)(_info_t *, char*);
 
-static int
-open_syms(void *handle)
-{
-	if((func_get_data = dlsym(handle, "get_data")) == NULL)
-		return -1;
-
-	if((func_get_length = dlsym(handle, "get_length")) == NULL)
-		goto _go_close0;
-
-	if((func_get_valid = dlsym(handle, "get_valid")) == NULL)
-		goto _go_close1;
-
-	if((func_get_info = dlsym(handle, "get_info")) == NULL)
-		goto _go_close2;
-
-	return 0;
-
-_go_close2:
-	dlclose(func_get_valid);
-_go_close1:
-	dlclose(func_get_length);
-_go_close0:
-	dlclose(func_get_data);
-
-	return -1;
-}
-
 static void
 close_syms(void)
 {
-	dlclose(func_get_data);
-	dlclose(func_get_length);
-	dlclose(func_get_valid);
-	dlclose(func_get_info);
+	dlclose(handle);
 	return;
+}
+
+static int
+open_syms(void)
+{
+	if((func_get_data = dlsym(handle, "get_data")) == NULL)
+		goto _go_close_err;
+
+	if((func_get_length = dlsym(handle, "get_length")) == NULL)
+		goto _go_close_err;
+
+	if((func_get_valid = dlsym(handle, "get_valid")) == NULL)
+		goto _go_close_err;
+
+	if((func_get_info = dlsym(handle, "get_info")) == NULL)
+		goto _go_close_err;
+
+	return 0;
+
+_go_close_err:
+	close_syms();
+
+	return -1;
 }
 
 size_t
@@ -121,7 +116,6 @@ int
 network_open_module(const char *name)
 {
 	int i;
-	void *handle;
 
 	for(i = 0; modules[i].name; i++)
 	{
@@ -129,10 +123,10 @@ network_open_module(const char *name)
 			continue;
 
 		if((handle = dlopen(modules[i].path, RTLD_NOW)) ==
-	NULL)
+		NULL)
 			break;
 
-		if(open_syms(handle) == -1)
+		if(open_syms() == -1)
 			break;
 
 		return 0;

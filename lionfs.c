@@ -296,7 +296,7 @@ main(int argc, char **argv)
 
 	fuse_main(argc, argv, &fuseopr, NULL);
 
-	// network_close_module(); TODO do not working!
+	network_close_module();
 
 _go_free:
 	array_del((Array) filelist.file);
