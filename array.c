@@ -17,10 +17,6 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
-/*
- * Originally designed to The Opencall Project
- */
-
 #include <stdlib.h>
 #include <errno.h>
 
@@ -323,18 +319,10 @@ array_object_change(Array array, ArrayPosition array_position_a,
  *
  * @p array The array.
  */
-ArrayPosition
+inline ArrayPosition
 array_object_get_position(Array array, void *object)
 {
-	unsigned int i;
-
-	for(i = 0; i < get_size(array); i++)
-	{
-		if(object == array[i])
-			return i;
-	}
-
-	return -1;
+	return get_header(object)->array_position;
 }
 
 /**
@@ -343,7 +331,7 @@ array_object_get_position(Array array, void *object)
  *
  * @p array The array.
  */
-ArrayPosition
+inline ArrayPosition
 array_object_get_last(Array array)
 {
 	return object_get_last(array);
@@ -447,7 +435,7 @@ array_del(Array array)
  *
  * @p array The array.
  */
-size_t
+inline size_t
 array_get_size(Array array)
 {
 	return get_size(array);

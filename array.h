@@ -17,10 +17,6 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
-/*
- * Originally designed to The Opencall Project
- */
-
 typedef void** Array;
 
 typedef signed int ArrayPosition;
@@ -40,17 +36,7 @@ struct _header_t
 
 #define HEADER_SIZE sizeof(struct _header_t)
 
-/* array specific functions */
-Array
-array_new(size_t);
-
-int
-array_del(Array);
-
-size_t
-array_get_size(Array);
-
-/* object specific functions */
+/* Object specific functions */
 int
 array_object_link(Array, void*);
 
@@ -60,10 +46,10 @@ array_object_unlink(Array, ArrayPosition);
 int
 array_object_change(Array, ArrayPosition, ArrayPosition);
 
-ArrayPosition
+inline ArrayPosition
 array_object_get_position(Array, void*);
 
-ArrayPosition
+inline ArrayPosition
 array_object_get_last(Array);
 
 void*
@@ -71,3 +57,13 @@ array_object_alloc(size_t);
 
 int
 array_object_free(void*);
+
+/* Array specific functions */
+Array
+array_new(size_t);
+
+int
+array_del(Array);
+
+inline size_t
+array_get_size(Array);
