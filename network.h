@@ -27,7 +27,7 @@ int
 network_file_get_valid(char*);
 
 int
-network_file_get_info(char*, _file_t*);
+network_file_get_info(char*, lionfile_t*);
 
 int
 network_open_module(const char*);

@@ -26,12 +26,12 @@ typedef struct
 	long long size;
 	mode_t mode;
 	time_t mtime; /* Last Modified */
-} _file_t;
+} lionfile_t;
 
 typedef struct
 {
 	size_t count;
-	_file_t **file;
+	lionfile_t **file;
 } _filelist_t;
 
 #define MAX_FILES 64

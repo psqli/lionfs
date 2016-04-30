@@ -99,7 +99,7 @@ network_file_get_valid(char *url)
 }
 
 int
-network_file_get_info(char *url, _file_t *file)
+network_file_get_info(char *url, lionfile_t *file)
 {
 	_info_t info;
 

@@ -150,7 +150,7 @@ int
 lion_unlink(const char *path)
 {
 	int fid;
-	_file_t *file;
+	lionfile_t *file;
 
 	if((fid = get_fid_by_path(path)) < 0)
 		return -ENOENT;
@@ -172,7 +172,7 @@ lion_unlink(const char *path)
 int
 lion_symlink(const char *url, const char *path)
 {
-	_file_t *file;
+	lionfile_t *file;
 
 	if(filelist.count == MAX_FILES)
 		return -ENOMEM;
@@ -183,7 +183,7 @@ lion_symlink(const char *url, const char *path)
 	if(network_file_get_valid((char*) url))
 		return -EHOSTUNREACH;
 
-	file = array_object_alloc(sizeof(_file_t));
+	file = array_object_alloc(sizeof(lionfile_t));
 
 	if(file == NULL)
 		return -ENOMEM;
@@ -285,7 +285,7 @@ main(int argc, char **argv)
 {
 	int ret = 0;
 
-	if((filelist.file = (_file_t**) array_new(MAX_FILES)) == NULL)
+	if((filelist.file = (lionfile_t**) array_new(MAX_FILES)) == NULL)
 		return 1;
 
 	if(network_open_module("http") == -1)
