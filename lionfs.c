@@ -34,68 +34,38 @@
 #include "network.h"
 #include "array.h"
 
-_filelist_t filelist = { 0, };
+_filelist_t filelist = { 0 /* File count initialized with zero */, };
 
-inline time_t
-get_mtime(int fid)
-{
-	return (filelist.file[fid])->mtime;
-}
-
-inline mode_t
-get_mode(int fid)
-{
-	return (filelist.file[fid])->mode;
-}
-
-inline long long
-get_size(int fid)
-{
-	return (filelist.file[fid])->size;
-}
-
-inline char*
-get_url(int fid)
-{
-	return (filelist.file[fid])->url;
-}
-
-inline char*
-get_path(int fid)
-{
-	return (filelist.file[fid])->path;
-}
-
-int
-get_fid_by_path(const char *path)
+lionfile_t*
+get_file_by_path(const char *path)
 {
 	int i;
 
 	for(i = 0; i < filelist.count; i++)
 	{
-		if(strcmp(path, get_path(i)) == 0)
-			return i;
+		if(strcmp(path, filelist.file[i]->path) == 0)
+			return filelist.file[i];
 	}
 
-	return -1;
+	return NULL;
 }
 
-int
-get_fid_by_ff(const char *path)
+lionfile_t*
+get_file_by_ff(const char *path)
 {
 	if(strncmp(path, "/.ff/", 5) == 0)
 	{
 		path += 4;
-		return get_fid_by_path(path);
+		return get_file_by_path(path);
 	}
 
-	return -1;
+	return NULL;
 }
 
 int
 lion_getattr(const char *path, struct stat *buf)
 {
-	int fid;
+	lionfile_t *file;
 
 	memset(buf, 0, sizeof(struct stat));
 
@@ -113,21 +83,21 @@ lion_getattr(const char *path, struct stat *buf)
 		return 0;
 	}
 
-	if((fid = get_fid_by_ff(path)) >= 0)
+	if((file = get_file_by_ff(path)) != NULL)
 	{
 		buf->st_mode = S_IFREG | 0444;
-		buf->st_size = get_size(fid);
-		buf->st_mtime = get_mtime(fid);
+		buf->st_size = file->size;
+		buf->st_mtime = file->mtime;
 		buf->st_nlink = 0;
 		return 0;
 	}
 
-	if((fid = get_fid_by_path(path)) < 0)
+	if((file = get_file_by_path(path)) == NULL)
 		return -ENOENT;
 
-	buf->st_mode = get_mode(fid);
-	buf->st_size = get_size(fid);
-	buf->st_mtime = get_mtime(fid);
+	buf->st_mode = file->mode;
+	buf->st_size = file->size;
+	buf->st_mtime = file->mtime;
 	buf->st_nlink = 1;
 
 	return 0;
@@ -136,12 +106,12 @@ lion_getattr(const char *path, struct stat *buf)
 int
 lion_readlink(const char *path, char *buf, size_t len)
 {
-	int fid;
+	lionfile_t *file;
 
-	if((fid = get_fid_by_path(path)) < 0)
+	if((file = get_file_by_path(path)) == NULL)
 		return -ENOENT;
 
-	snprintf(buf, len, ".ff/%s", get_path(fid) + 1);
+	snprintf(buf, len, ".ff/%s", file->path + 1);
 
 	return 0;
 }
@@ -149,15 +119,13 @@ lion_readlink(const char *path, char *buf, size_t len)
 int
 lion_unlink(const char *path)
 {
-	int fid;
 	lionfile_t *file;
 
-	if((fid = get_fid_by_path(path)) < 0)
+	if((file = get_file_by_path(path)) == NULL)
 		return -ENOENT;
 
-	file = filelist.file[fid];
-
-	array_object_unlink((Array) filelist.file, fid);
+	array_object_unlink((Array) filelist.file,
+	array_object_get_position((Array) filelist.file, file));
 
 	filelist.count--;
 
@@ -177,7 +145,7 @@ lion_symlink(const char *url, const char *path)
 	if(filelist.count == MAX_FILES)
 		return -ENOMEM;
 
-	if(get_fid_by_path(path) >= 0)
+	if(get_file_by_path(path) != NULL)
 		return -EEXIST;
 
 	if(network_file_get_valid((char*) url))
@@ -208,17 +176,17 @@ lion_symlink(const char *url, const char *path)
 int
 lion_rename(const char *oldpath, const char *newpath)
 {
-	int fid;
+	lionfile_t *file;
 	char **path_pointer;
 	size_t newsize;
 
-	if((fid = get_fid_by_path(oldpath)) < 0)
+	if((file = get_file_by_path(oldpath)) == NULL)
 		return -ENOENT;
 
-	if(get_fid_by_path(newpath) >= 0)
+	if(get_file_by_path(newpath) != NULL)
 		return -EEXIST;
 
-	path_pointer = &(filelist.file[fid])->path;
+	path_pointer = &file->path;
 	newsize = strlen(newpath) + 1;
 
 	if(newsize == 1)
@@ -235,20 +203,20 @@ int
 lion_read(const char *path, char *buf, size_t size, off_t off,
 	struct fuse_file_info *fi)
 {
-	int fid;
+	lionfile_t *file;
 
-	if((fid = get_fid_by_ff(path)) < 0)
+	if((file = get_file_by_ff(path)) == NULL)
 		return -ENOENT;
 
-	if(off < get_size(fid))
+	if(off < file->size)
 	{
-		if(off + size > get_size(fid))
-			size = get_size(fid) - off;
+		if(off + size > file->size)
+			size = file->size - off;
 	}
 	else
 		return 0;
 
-	return network_file_get_data(get_url(fid), size, off, buf);
+	return network_file_get_data(file->url, size, off, buf);
 }
 
 int
@@ -264,7 +232,7 @@ lion_readdir(const char *path, void *buf, fuse_fill_dir_t filler, off_t off,
 	filler(buf, "..", NULL, 0);
 
 	for(i = 0; i < filelist.count; i++)
-		filler(buf, get_path(i) + 1, NULL, 0);
+		filler(buf, filelist.file[i]->path + 1, NULL, 0);
 
 	return 0;
 }
