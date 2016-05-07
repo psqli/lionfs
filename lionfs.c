@@ -124,8 +124,7 @@ lion_unlink(const char *path)
 	if((file = get_file_by_path(path)) == NULL)
 		return -ENOENT;
 
-	array_object_unlink((Array) filelist.file,
-	array_object_get_position((Array) filelist.file, file));
+	array_object_unlink((Array) filelist.file, file);
 
 	filelist.count--;
 

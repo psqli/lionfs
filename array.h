@@ -41,7 +41,7 @@ int
 array_object_link(Array, void*);
 
 int
-array_object_unlink(Array, ArrayPosition);
+array_object_unlink(Array, void*);
 
 int
 array_object_change(Array, ArrayPosition, ArrayPosition);

@@ -280,12 +280,13 @@ array_object_link(Array array, void *object)
 }
 
 int
-array_object_unlink(Array array, ArrayPosition array_position)
+array_object_unlink(Array array, void *object)
 {
-	if(array[array_position] == NULL)
-		return -EINVAL;
+	ArrayPosition array_position;
 
-	array[array_position] = NULL;
+	array_position = get_header(object)->array_position;
+
+	object = NULL;
 
 	if(object_get_last(array) != array_position)
 		align_array(array, array_position);
