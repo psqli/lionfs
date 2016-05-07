@@ -17,6 +17,9 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
+/* *_file_get functions
+ * These functions get something from a file */
+
 size_t
 network_file_get_data(char*, size_t, long long, void*);
 
@@ -29,8 +32,19 @@ network_file_get_valid(char*);
 int
 network_file_get_info(char*, lionfile_t*);
 
+/* General network functions */
+
 int
 network_open_module(const char*);
 
 void
-network_close_module(void);
+network_open_all_modules(void);
+
+int
+network_close_module(const char*);
+
+void
+network_close_all_modules(void);
+
+void
+network_init(void);

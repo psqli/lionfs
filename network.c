@@ -28,115 +28,239 @@ struct nmodule
 {
 	const char *name;
 	const char *path;
-};
-
-static void *handle;
+	void *handle;
+	
+	size_t
+	(*func_get_data)(void*, char*, long long, size_t);
+	
+	long long
+	(*func_get_length)(char*);
+	
+	int
+	(*func_get_valid)(char*);
+	
+	int
+	(*func_get_info)(_info_t *, char*);
+}; /* 28 bytes structure */
 
 static struct nmodule modules[] =
 {
-	{"http", "modules/http"},
+	{"http", "./modules/http",},
 	{NULL, NULL},
 };
 
-static size_t
-(*func_get_data)(void*, char*, long long, size_t);
-
-static long long
-(*func_get_length)(char*);
-
-static int
-(*func_get_valid)(char*);
-
-static int
-(*func_get_info)(_info_t *, char*);
-
-static void
-close_syms(void)
+static inline void
+clean_pointers(struct nmodule *nm)
 {
-	dlclose(handle);
+	/* Clean with zeroes all pointers to functions and the handle used for
+	 * dlopen().
+	 * We only get the address of handle and fill all the rest of
+	 * structure ( sizeof(struct nmodule) - 2 * sizeof(void*) ) with
+	 * zeroes. */
+	memset(&nm->handle, 0, sizeof(struct nmodule) - 2 * sizeof(void*));
 	return;
 }
 
 static int
-open_syms(void)
+load_syms(struct nmodule *nm)
 {
-	if((func_get_data = dlsym(handle, "get_data")) == NULL)
-		goto _go_close_err;
-
-	if((func_get_length = dlsym(handle, "get_length")) == NULL)
-		goto _go_close_err;
-
-	if((func_get_valid = dlsym(handle, "get_valid")) == NULL)
-		goto _go_close_err;
-
-	if((func_get_info = dlsym(handle, "get_info")) == NULL)
-		goto _go_close_err;
-
+	if((nm->func_get_data = dlsym(nm->handle, "get_data")) == NULL)
+		return -1;
+	
+	if((nm->func_get_length = dlsym(nm->handle, "get_length")) == NULL)
+		return -1;
+	
+	if((nm->func_get_valid = dlsym(nm->handle, "get_valid")) == NULL)
+		return -1;
+	
+	if((nm->func_get_info = dlsym(nm->handle, "get_info")) == NULL)
+		return -1;
+	
 	return 0;
+}
 
-_go_close_err:
-	close_syms();
+static int
+close_module(struct nmodule *nm)
+{
+	if(!nm->handle)
+		return -1;
+	
+	if(dlclose(nm->handle))
+		return -1;
+	
+	clean_pointers(nm);
+	
+	return 0;
+}
 
-	return -1;
+static int
+open_module(struct nmodule *nm)
+{
+	if(nm->handle)
+		return -1;
+	
+	if((nm->handle = dlopen(nm->path, RTLD_NOW)) == NULL)
+		return -1;
+	
+	if(load_syms(nm) == -1)
+	{
+		close_module(nm); /* We've already opened the module */
+		return -1;
+	}
+}
+
+static struct nmodule*
+find_module_by_name(const char *name)
+{
+	int i;
+	
+	for(i = 0; modules[i].name; i++)
+	{
+		if(strcmp(modules[i].name, name) == 0)
+			return &modules[i];
+	}
+	
+	return NULL;
+}
+
+/* Define max URL scheme size.
+ * Scheme size is: "http://" = 4 Bytes + '\0' = 5 Bytes) */
+#define SCHEME_SIZE 8
+
+static struct nmodule*
+find_module_by_url(const char *url)
+{
+	int i;
+	char scheme[SCHEME_SIZE];
+	
+	for(i = 0; *url && i < SCHEME_SIZE; i++)
+	{
+		scheme[i] = url[i];
+		if(url[i] == ':')
+		{
+			scheme[i] = '\0';
+			return find_module_by_name(scheme);
+		}
+	}
+	
+	return NULL;
 }
 
 size_t
 network_file_get_data(char *url, size_t size, long long off, void *data)
 {
-	return func_get_data(data, url, off, size);
+	struct nmodule *nm;
+	
+	if((nm = find_module_by_url(url)) == NULL)
+		return 0;
+	
+	if(!nm->func_get_data)
+		return 0;
+	
+	return nm->func_get_data(data, url, off, size);
 }
 
 long long
 network_file_get_length(char *url)
 {
-	return func_get_length(url);
+	struct nmodule *nm;
+	
+	if((nm = find_module_by_url(url)) == NULL)
+		return 0;
+	
+	if(!nm->func_get_length)
+		return 0;
+	
+	return nm->func_get_length(url);
 }
 
 int
 network_file_get_valid(char *url)
 {
-	return func_get_valid(url);
+	struct nmodule *nm;
+	
+	if((nm = find_module_by_url(url)) == NULL)
+		return -1;
+	
+	if(!nm->func_get_valid)
+		return -1;
+	
+	return nm->func_get_valid(url);
 }
 
 int
 network_file_get_info(char *url, lionfile_t *file)
 {
+	struct nmodule *nm;
 	_info_t info;
-
-	if(func_get_info(&info, url) == -1)
+	
+	memset((void*) &info, 0, sizeof(_info_t));
+	
+	if((nm = find_module_by_url(url)) == NULL)
 		return -1;
-
+	
+	if(!nm->func_get_info)
+		return -1;
+	
+	if(nm->func_get_info(&info, url) == -1)
+		return -1;
+	
 	file->size = info.size;
 	file->mtime = info.mtime;
-
+	
 	return 0;
 }
 
 int
 network_open_module(const char *name)
 {
-	int i;
-
-	for(i = 0; modules[i].name; i++)
-	{
-		if(strcmp(modules[i].name, name) != 0)
-			continue;
-
-		if((handle = dlopen(modules[i].path, RTLD_NOW)) ==
-		NULL)
-			break;
-
-		if(open_syms() == -1)
-			break;
-
-		return 0;
-	}
-
-	return -1;
+	struct nmodule *nm;
+	
+	if((nm = find_module_by_name(name)) == NULL)
+		return -1;
+	
+	return open_module(nm);
 }
 
 void
-network_close_module(void)
+network_open_all_modules(void)
 {
-	return close_syms();
+	int i;
+	
+	for(i = 0; modules[i].name; i++)
+		open_module(&modules[i]);
+	
+	return;
+}
+
+int
+network_close_module(const char *name)
+{
+	struct nmodule *nm;
+	
+	if((nm = find_module_by_name(name)) == NULL)
+		return -1;
+	
+	return close_module(nm);
+}
+
+void
+network_close_all_modules(void)
+{
+	int i;
+	
+	for(i = 0; modules[i].name; i++)
+		close_module(&modules[i]);
+	
+	return;
+}
+
+/* Before all, you should call this function! */
+void
+network_init(void)
+{
+	int i;
+	
+	for(i = 0; modules[i].name; i++)
+		clean_pointers(&modules[i]);
 }

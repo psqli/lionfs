@@ -248,23 +248,16 @@ struct fuse_operations fuseopr =
 int
 main(int argc, char **argv)
 {
-	int ret = 0;
-
 	if((filelist.file = (lionfile_t**) array_new(MAX_FILES)) == NULL)
 		return 1;
 
-	if(network_open_module("http") == -1)
-	{
-		ret = 1;
-		goto _go_free;
-	}
+	network_open_all_modules();
 
 	fuse_main(argc, argv, &fuseopr, NULL);
 
-	network_close_module();
+	network_close_all_modules();
 
-_go_free:
 	array_del((Array) filelist.file);
 
-	return ret;
+	return 0;
 }
