@@ -28,9 +28,4 @@ typedef struct
 	time_t mtime; /* Last Modified */
 } lionfile_t;
 
-typedef struct
-{
-	lionfile_t **file;
-} _filelist_t;
-
 #define MAX_FILES 64

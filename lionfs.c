@@ -34,25 +34,25 @@
 #include "network.h"
 #include "array.h"
 
-#define file_count (array_object_get_last((Array) filelist.file) + 1)
+#define file_count (array_object_get_last((Array) files) + 1)
 
-_filelist_t filelist;
+lionfile_t **files;
 
-lionfile_t*
+static lionfile_t*
 get_file_by_path(const char *path)
 {
 	int i;
 
 	for(i = 0; i < file_count; i++)
 	{
-		if(strcmp(path, filelist.file[i]->path) == 0)
-			return filelist.file[i];
+		if(strcmp(path, files[i]->path) == 0)
+			return files[i];
 	}
 
 	return NULL;
 }
 
-lionfile_t*
+static lionfile_t*
 get_file_by_ff(const char *path)
 {
 	if(strncmp(path, "/.ff/", 5) == 0)
@@ -64,7 +64,11 @@ get_file_by_ff(const char *path)
 	return NULL;
 }
 
-int
+// ================
+// Fuse operations:
+// ================
+
+static int
 lion_getattr(const char *path, struct stat *buf)
 {
 	lionfile_t *file;
@@ -105,7 +109,7 @@ lion_getattr(const char *path, struct stat *buf)
 	return 0;
 }
 
-int
+static int
 lion_readlink(const char *path, char *buf, size_t len)
 {
 	lionfile_t *file;
@@ -118,7 +122,7 @@ lion_readlink(const char *path, char *buf, size_t len)
 	return 0;
 }
 
-int
+static int
 lion_unlink(const char *path)
 {
 	lionfile_t *file;
@@ -126,7 +130,7 @@ lion_unlink(const char *path)
 	if((file = get_file_by_path(path)) == NULL)
 		return -ENOENT;
 
-	array_object_unlink((Array) filelist.file, file);
+	array_object_unlink((Array) files, file);
 
 	free(file->path);
 	free(file->url);
@@ -136,7 +140,7 @@ lion_unlink(const char *path)
 	return 0;
 }
 
-int
+static int
 lion_symlink(const char *url, const char *path)
 {
 	lionfile_t *file;
@@ -165,12 +169,12 @@ lion_symlink(const char *url, const char *path)
 
 	network_file_get_info(file->url, file);
 
-	array_object_link((Array) filelist.file, file);
+	array_object_link((Array) files, file);
 
 	return 0;
 }
 
-int
+static int
 lion_rename(const char *oldpath, const char *newpath)
 {
 	lionfile_t *file;
@@ -196,7 +200,7 @@ lion_rename(const char *oldpath, const char *newpath)
 	return 0;
 }
 
-int
+static int
 lion_read(const char *path, char *buf, size_t size, off_t off,
 	struct fuse_file_info *fi)
 {
@@ -216,7 +220,7 @@ lion_read(const char *path, char *buf, size_t size, off_t off,
 	return network_file_get_data(file->url, size, off, buf);
 }
 
-int
+static int
 lion_readdir(const char *path, void *buf, fuse_fill_dir_t filler, off_t off,
 	struct fuse_file_info *fi)
 {
@@ -229,12 +233,12 @@ lion_readdir(const char *path, void *buf, fuse_fill_dir_t filler, off_t off,
 	filler(buf, "..", NULL, 0);
 
 	for(i = 0; i < file_count; i++)
-		filler(buf, filelist.file[i]->path + 1, NULL, 0);
+		filler(buf, files[i]->path + 1, NULL, 0);
 
 	return 0;
 }
 
-struct fuse_operations fuseopr =
+static struct fuse_operations fuseopr =
 {
 	.getattr = lion_getattr,
 	.readlink = lion_readlink,
@@ -248,16 +252,21 @@ struct fuse_operations fuseopr =
 int
 main(int argc, char **argv)
 {
-	if((filelist.file = (lionfile_t**) array_new(MAX_FILES)) == NULL)
+	// Create files array.
+	if((files = (lionfile_t**) array_new(MAX_FILES)) == NULL)
 		return 1;
 
+	// Open all network modules available.
 	network_open_all_modules();
 
+	// Main routine. It initializes FUSE and set the operations (&fuseopr).
 	fuse_main(argc, argv, &fuseopr, NULL);
 
+	// Close all network modules.
 	network_close_all_modules();
 
-	array_del((Array) filelist.file);
+	// Delete files array.
+	array_del((Array) files);
 
 	return 0;
 }
