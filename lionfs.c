@@ -34,14 +34,16 @@
 #include "network.h"
 #include "array.h"
 
-_filelist_t filelist = { 0 /* File count initialized with zero */, };
+#define file_count (array_object_get_last((Array) filelist.file) + 1)
+
+_filelist_t filelist;
 
 lionfile_t*
 get_file_by_path(const char *path)
 {
 	int i;
 
-	for(i = 0; i < filelist.count; i++)
+	for(i = 0; i < file_count; i++)
 	{
 		if(strcmp(path, filelist.file[i]->path) == 0)
 			return filelist.file[i];
@@ -126,8 +128,6 @@ lion_unlink(const char *path)
 
 	array_object_unlink((Array) filelist.file, file);
 
-	filelist.count--;
-
 	free(file->path);
 	free(file->url);
 
@@ -141,7 +141,7 @@ lion_symlink(const char *url, const char *path)
 {
 	lionfile_t *file;
 
-	if(filelist.count == MAX_FILES)
+	if(file_count == MAX_FILES)
 		return -ENOMEM;
 
 	if(get_file_by_path(path) != NULL)
@@ -166,8 +166,6 @@ lion_symlink(const char *url, const char *path)
 	network_file_get_info(file->url, file);
 
 	array_object_link((Array) filelist.file, file);
-
-	filelist.count++;
 
 	return 0;
 }
@@ -230,7 +228,7 @@ lion_readdir(const char *path, void *buf, fuse_fill_dir_t filler, off_t off,
 	filler(buf, ".", NULL, 0);
 	filler(buf, "..", NULL, 0);
 
-	for(i = 0; i < filelist.count; i++)
+	for(i = 0; i < file_count; i++)
 		filler(buf, filelist.file[i]->path + 1, NULL, 0);
 
 	return 0;

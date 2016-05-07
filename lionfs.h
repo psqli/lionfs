@@ -30,7 +30,6 @@ typedef struct
 
 typedef struct
 {
-	size_t count;
 	lionfile_t **file;
 } _filelist_t;
 
