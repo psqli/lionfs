@@ -1,2 +1,2 @@
 language: c
-script: ./compile-all
+script: ./compile-all.sh
