@@ -256,6 +256,9 @@ main(int argc, char **argv)
 	if((files = (lionfile_t**) array_new(MAX_FILES)) == NULL)
 		return 1;
 
+	// Init network
+	network_init();
+
 	// Open all network modules available.
 	network_open_all_modules();
 
