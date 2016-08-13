@@ -46,10 +46,10 @@ array_object_unlink(Array, void*);
 int
 array_object_change(Array, ArrayPosition, ArrayPosition);
 
-inline ArrayPosition
+ArrayPosition
 array_object_get_position(Array, void*);
 
-inline ArrayPosition
+ArrayPosition
 array_object_get_last(Array);
 
 void*
@@ -65,5 +65,5 @@ array_new(size_t);
 int
 array_del(Array);
 
-inline size_t
+size_t
 array_get_size(Array);

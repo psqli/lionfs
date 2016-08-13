@@ -320,7 +320,7 @@ array_object_change(Array array, ArrayPosition array_position_a,
  *
  * @p array The array.
  */
-inline ArrayPosition
+ArrayPosition
 array_object_get_position(Array array, void *object)
 {
 	return get_header(object)->array_position;
@@ -332,7 +332,7 @@ array_object_get_position(Array array, void *object)
  *
  * @p array The array.
  */
-inline ArrayPosition
+ArrayPosition
 array_object_get_last(Array array)
 {
 	return object_get_last(array);
@@ -436,7 +436,7 @@ array_del(Array array)
  *
  * @p array The array.
  */
-inline size_t
+size_t
 array_get_size(Array array)
 {
 	return get_size(array);
