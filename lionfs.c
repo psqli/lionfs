@@ -61,7 +61,14 @@ get_file_by_ff (const char *path) {
 
 
 // ================
-// Fuse operations:
+// fuse operations:
+//   lion_getattr()   get attributes (information) from a file
+//   lion_readlink()  get target of a symbolic link (or get the fakefile ...)
+//   lion_unlink()    removes a file -- only symlinks in lionfs :-)
+//   lion_symlink()   creates a symlink
+//   lion_rename()    renames a file -- only symlinks as lion_unlink()
+//   lion_read()      reads content of a file (reads content of fakefiles)
+//   lion_readdir()   get files in a directory (get symlinks in lionfs array)
 // ================
 
 static int
@@ -70,24 +77,25 @@ lion_getattr (const char *path, struct stat *buf) {
 
 	memset(buf, 0, sizeof(struct stat));
 
+	/* is it our root directory? */
 	if (strcmp(path, "/") == 0) {
 		buf->st_mode = S_IFDIR | 0775;
 		buf->st_nlink = 2;
 		return 0;
 	}
 
+	/* is it fakefiles directory? */
 	if (strcmp(path, "/.ff") == 0) {
-		/* fakefiles directory is read-only */
+		/* fakefiles directory needs to be read-only */
 		buf->st_mode = S_IFDIR | 0444;
 		buf->st_nlink = 0;
 		return 0;
 	}
 
-	pthread_rwlock_rdlock(&rwlock);
+	pthread_rwlock_rdlock(&rwlock); /* read lock */
 
+	/* is it a fakefile! */
 	if ((file = get_file_by_ff(path)) != NULL) {
-		/* It's a fakefile! */
-
 		buf->st_mode = S_IFREG | 0444;
 		buf->st_mtime = file->mtime;
 		buf->st_nlink = 0;
@@ -97,15 +105,17 @@ lion_getattr (const char *path, struct stat *buf) {
 		return 0;
 	}
 
+	/* doesn't symlink exist? */
 	if ((file = get_file_by_path(path)) == NULL) {
 		pthread_rwlock_unlock(&rwlock);
 		return -ENOENT;
 	}
 
-	buf->st_mode = file->mode;
+	/* If symlink exists we do this:  */
+	buf->st_mode = file->mode | S_IFLNK; /* S_IFLNK = symlink bitmask */
+	buf->st_mtime = file->mtime; /* modification time */
+	buf->st_nlink = 1; /*number of hard links (here it's not so important)*/
 	buf->st_size = file->size;
-	buf->st_mtime = file->mtime;
-	buf->st_nlink = 1;
 
 	pthread_rwlock_unlock(&rwlock);
 
@@ -116,8 +126,9 @@ static int
 lion_readlink (const char *path, char *buf, size_t len) {
 	lionfile_t *file;
 
-	pthread_rwlock_rdlock(&rwlock);
+	pthread_rwlock_rdlock(&rwlock); /* read lock */
 
+	/* doesn't symlink exist? */
 	if ((file = get_file_by_path(path)) == NULL) {
 		pthread_rwlock_unlock(&rwlock);
 		return -ENOENT;
@@ -134,8 +145,9 @@ static int
 lion_unlink (const char *path) {
 	lionfile_t *file;
 
-	pthread_rwlock_wrlock(&rwlock);
+	pthread_rwlock_wrlock(&rwlock); /* write lock */
 
+	/* doesn't symlink exist? */
 	if ((file = get_file_by_path(path)) == NULL) {
 		pthread_rwlock_unlock(&rwlock);
 		return -ENOENT;
@@ -157,19 +169,21 @@ lion_symlink (const char *url, const char *path) {
 	lionfile_t network_file;
 	lionfile_t *file;
 
-	/* Check if URL exists and get its info */
+	/* check if URL exists and get its info */
 	if (network_file_get_valid((char*) url))
 		return -EHOSTUNREACH;
 	if (network_file_get_info((char*) url, &network_file))
 		return -EHOSTUNREACH;
 
-	pthread_rwlock_wrlock(&rwlock);
+	pthread_rwlock_wrlock(&rwlock); /* write lock */
 
+	/* we've a maximum number of symlink(files) allowed in array yet */
 	if (file_count == MAX_FILES) {
 		pthread_rwlock_unlock(&rwlock);
 		return -ENOMEM;
 	}
 
+	/* does symlink already exist? */
 	if (get_file_by_path(path) != NULL) {
 		pthread_rwlock_unlock(&rwlock);
 		return -EEXIST;
@@ -188,7 +202,8 @@ lion_symlink (const char *url, const char *path) {
 	strcpy(file->path, path);
 	strcpy(file->url, url);
 
-	file->mode = S_IFLNK | 0444;
+	/* symlinks are read-only :-) -- fakefiles copy this */
+	file->mode = 0444;
 
 	/* TODO do not use `network_file`
 	 * replace it with a lionfileinfo_t structure (for example) */
@@ -208,12 +223,14 @@ lion_rename (const char *oldpath, const char *newpath) {
 	char **path_pointer;
 	size_t newsize;
 
-	pthread_rwlock_wrlock(&rwlock);
+	pthread_rwlock_wrlock(&rwlock); /* write lock */
 
+	/* does new-symlink-name already exist? */
 	if (get_file_by_path(newpath) != NULL) {
 		pthread_rwlock_unlock(&rwlock);
 		return -EEXIST;
 	}
+	/* doesn't old-symlink-name exist? */
 	if ((file = get_file_by_path(oldpath)) == NULL) {
 		pthread_rwlock_unlock(&rwlock);
 		return -ENOENT;
@@ -242,8 +259,9 @@ lion_read (const char *path, char *buf, size_t size, off_t off,
 	lionfile_t *file;
 	size_t ret = 0;
 
-	pthread_rwlock_rdlock(&rwlock);
+	pthread_rwlock_rdlock(&rwlock); /* read lock */
 
+	/* doesn't symlink exist? */
 	if ((file = get_file_by_ff(path)) == NULL) {
 		pthread_rwlock_unlock(&rwlock);
 		return -ENOENT;
@@ -269,13 +287,14 @@ lion_readdir (const char *path, void *buf, fuse_fill_dir_t filler, off_t off,
 	struct fuse_file_info *fi) {
 	int i;
 
+	/* doesn't path equals "/" */
 	if (strcmp(path, "/") != 0)
 		return -ENOENT;
 
 	filler(buf, ".", NULL, 0);
 	filler(buf, "..", NULL, 0);
 
-	pthread_rwlock_rdlock(&rwlock);
+	pthread_rwlock_rdlock(&rwlock); /* read lock */
 
 	for (i = 0; i < file_count; i++)
 		filler(buf, files[i]->path + 1, NULL, 0);
@@ -299,33 +318,33 @@ int
 main (int argc, char **argv) {
 	int ret = 0;
 
-	// Init rwlock
+	// init rwlock
 	if(pthread_rwlock_init(&rwlock, NULL))
 		return 1;
 
-	// Create files array.
+	// create files array.
 	if ((files = (lionfile_t**) array_new(MAX_FILES)) == NULL) {
 		ret = 1;
 		goto _go_destroy_rwlock;
 	}
 
-	// Init network
+	// init network
 	network_init();
 
-	// Open all network modules available.
+	// open all network modules available.
 	network_open_all_modules();
 
 	// Main routine. It initializes FUSE and set the operations (&fuseopr).
 	fuse_main(argc, argv, &fuseopr, NULL);
 
-	// Close all network modules.
+	// close all network modules.
 	network_close_all_modules();
 
-	// Delete files array.
+	// delete files array.
 	array_del((Array) files);
 
 _go_destroy_rwlock:
-	// Destroy rwlock
+	// destroy rwlock
 	pthread_rwlock_destroy(&rwlock);
 
 	return ret;
