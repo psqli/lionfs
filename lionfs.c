@@ -18,6 +18,7 @@
  */
 
 #include <errno.h>
+#include <pthread.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -31,12 +32,11 @@
 #include "array.h"
 #include "lionfs.h"
 #include "network.h"
-#include "vmutex.h"
 
 #define file_count (array_object_get_last((Array) files) + 1)
 
 lionfile_t **files;
-vmutex_t lockobj;
+pthread_rwlock_t rwlock;
 
 static lionfile_t*
 get_file_by_path (const char *path) {
@@ -83,7 +83,7 @@ lion_getattr (const char *path, struct stat *buf) {
 		return 0;
 	}
 
-	vmutex_increment(&lockobj);
+	pthread_rwlock_rdlock(&rwlock);
 
 	if ((file = get_file_by_ff(path)) != NULL) {
 		/* It's a fakefile! */
@@ -93,12 +93,12 @@ lion_getattr (const char *path, struct stat *buf) {
 		buf->st_nlink = 0;
 		buf->st_size = file->size;
 
-		vmutex_decrement(&lockobj);
+		pthread_rwlock_unlock(&rwlock);
 		return 0;
 	}
 
 	if ((file = get_file_by_path(path)) == NULL) {
-		vmutex_decrement(&lockobj);
+		pthread_rwlock_unlock(&rwlock);
 		return -ENOENT;
 	}
 
@@ -107,7 +107,7 @@ lion_getattr (const char *path, struct stat *buf) {
 	buf->st_mtime = file->mtime;
 	buf->st_nlink = 1;
 
-	vmutex_decrement(&lockobj);
+	pthread_rwlock_unlock(&rwlock);
 
 	return 0;
 }
@@ -116,16 +116,16 @@ static int
 lion_readlink (const char *path, char *buf, size_t len) {
 	lionfile_t *file;
 
-	vmutex_increment(&lockobj);
+	pthread_rwlock_rdlock(&rwlock);
 
 	if ((file = get_file_by_path(path)) == NULL) {
-		vmutex_decrement(&lockobj);
+		pthread_rwlock_unlock(&rwlock);
 		return -ENOENT;
 	}
 
 	snprintf(buf, len, ".ff/%s", file->path + 1);
 
-	vmutex_decrement(&lockobj);
+	pthread_rwlock_unlock(&rwlock);
 
 	return 0;
 }
@@ -134,16 +134,16 @@ static int
 lion_unlink (const char *path) {
 	lionfile_t *file;
 
-	vmutex_acquire(&lockobj);
+	pthread_rwlock_wrlock(&rwlock);
 
 	if ((file = get_file_by_path(path)) == NULL) {
-		vmutex_release(&lockobj);
+		pthread_rwlock_unlock(&rwlock);
 		return -ENOENT;
 	}
 
 	array_object_unlink((Array) files, file);
 
-	vmutex_release(&lockobj);
+	pthread_rwlock_unlock(&rwlock);
 
 	free(file->path);
 	free(file->url);
@@ -163,22 +163,22 @@ lion_symlink (const char *url, const char *path) {
 	if (network_file_get_info((char*) url, &network_file))
 		return -EHOSTUNREACH;
 
-	vmutex_acquire(&lockobj);
+	pthread_rwlock_wrlock(&rwlock);
 
 	if (file_count == MAX_FILES) {
-		vmutex_release(&lockobj);
+		pthread_rwlock_unlock(&rwlock);
 		return -ENOMEM;
 	}
 
 	if (get_file_by_path(path) != NULL) {
-		vmutex_release(&lockobj);
+		pthread_rwlock_unlock(&rwlock);
 		return -EEXIST;
 	}
 
 	file = array_object_alloc(sizeof(lionfile_t));
 
 	if (file == NULL) {
-		vmutex_release(&lockobj);
+		pthread_rwlock_unlock(&rwlock);
 		return -ENOMEM;
 	}
 
@@ -197,7 +197,7 @@ lion_symlink (const char *url, const char *path) {
 
 	array_object_link((Array) files, file);
 
-	vmutex_release(&lockobj);
+	pthread_rwlock_unlock(&rwlock);
 
 	return 0;
 }
@@ -208,14 +208,14 @@ lion_rename (const char *oldpath, const char *newpath) {
 	char **path_pointer;
 	size_t newsize;
 
-	vmutex_acquire(&lockobj);
+	pthread_rwlock_wrlock(&rwlock);
 
 	if (get_file_by_path(newpath) != NULL) {
-		vmutex_release(&lockobj);
+		pthread_rwlock_unlock(&rwlock);
 		return -EEXIST;
 	}
 	if ((file = get_file_by_path(oldpath)) == NULL) {
-		vmutex_release(&lockobj);
+		pthread_rwlock_unlock(&rwlock);
 		return -ENOENT;
 	}
 
@@ -223,7 +223,7 @@ lion_rename (const char *oldpath, const char *newpath) {
 	newsize = strlen(newpath) + 1;
 
 	if (newsize == 1) {
-		vmutex_release(&lockobj);
+		pthread_rwlock_unlock(&rwlock);
 		return -EINVAL;
 	}
 
@@ -231,7 +231,7 @@ lion_rename (const char *oldpath, const char *newpath) {
 
 	memcpy(*path_pointer, newpath, newsize);
 
-	vmutex_release(&lockobj);
+	pthread_rwlock_unlock(&rwlock);
 
 	return 0;
 }
@@ -242,10 +242,10 @@ lion_read (const char *path, char *buf, size_t size, off_t off,
 	lionfile_t *file;
 	size_t ret = 0;
 
-	vmutex_increment(&lockobj);
+	pthread_rwlock_rdlock(&rwlock);
 
 	if ((file = get_file_by_ff(path)) == NULL) {
-		vmutex_decrement(&lockobj);
+		pthread_rwlock_unlock(&rwlock);
 		return -ENOENT;
 	}
 
@@ -253,13 +253,13 @@ lion_read (const char *path, char *buf, size_t size, off_t off,
 		if(off + size > file->size)
 			size = file->size - off;
 	} else {
-		vmutex_decrement(&lockobj);
+		pthread_rwlock_unlock(&rwlock);
 		return 0;
 	}
 
 	ret = network_file_get_data(file->url, size, off, buf);
 
-	vmutex_decrement(&lockobj);
+	pthread_rwlock_unlock(&rwlock);
 
 	return ret;
 }
@@ -275,12 +275,12 @@ lion_readdir (const char *path, void *buf, fuse_fill_dir_t filler, off_t off,
 	filler(buf, ".", NULL, 0);
 	filler(buf, "..", NULL, 0);
 
-	vmutex_increment(&lockobj);
+	pthread_rwlock_rdlock(&rwlock);
 
 	for (i = 0; i < file_count; i++)
 		filler(buf, files[i]->path + 1, NULL, 0);
 
-	vmutex_decrement(&lockobj);
+	pthread_rwlock_unlock(&rwlock);
 
 	return 0;
 }
@@ -297,12 +297,17 @@ static struct fuse_operations fuseopr = {
 
 int
 main (int argc, char **argv) {
-	// Create files array.
-	if ((files = (lionfile_t**) array_new(MAX_FILES)) == NULL)
+	int ret = 0;
+
+	// Init rwlock
+	if(pthread_rwlock_init(&rwlock, NULL))
 		return 1;
 
-	// Init vmutex
-	vmutex_init(&lockobj);
+	// Create files array.
+	if ((files = (lionfile_t**) array_new(MAX_FILES)) == NULL) {
+		ret = 1;
+		goto _go_destroy_rwlock;
+	}
 
 	// Init network
 	network_init();
@@ -316,11 +321,12 @@ main (int argc, char **argv) {
 	// Close all network modules.
 	network_close_all_modules();
 
-	// Destroy vmutex
-	vmutex_destroy(&lockobj);
-
 	// Delete files array.
 	array_del((Array) files);
 
-	return 0;
+_go_destroy_rwlock:
+	// Destroy rwlock
+	pthread_rwlock_destroy(&rwlock);
+
+	return ret;
 }
