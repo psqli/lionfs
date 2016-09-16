@@ -1,0 +1,7 @@
+	vmutex makes possible multiple callbacks be executed at the
+	same time
+
+It's far from to be the most efficient method to get multithreading in
+a program. vmutexes fails when readers never stops because to create/
+rename/delete/modify a file we need that all other reading threads end
+their activity. See more in vmutex.c

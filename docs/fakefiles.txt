@@ -1,0 +1,18 @@
+	fakefiles is the way in which lionfs identify each symbolic link
+	in directory.
+
+Maybe the most simple implementation possible is what we've used.
+
+Think a lionfs file (or a symbolic link). The symlink needs to contain
+some information like URL and size which makes its identification possible.
+These informations are stored in our array and to reach it, given a path,
+we need to know the target of the symbolic link.
+As many people could find obvious to put URL as target of the symlink it
+doesn't work because the slash '/' defines a directory and any program who
+tries to request target for lionfs will not get satisfied because system
+treat each slash as a directory (for example: http://a.com/a is parsed as
+directory"http:" directory"a.com" file"a").
+
+The solution was add fake files (fakefiles) as targets of symbolic links
+and when some program make requests to lionfs we know how to search by
+the file.
