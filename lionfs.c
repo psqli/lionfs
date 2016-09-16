@@ -17,46 +17,41 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
+#include <errno.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <errno.h>
 #include <string.h>
+#include <sys/stat.h>
+#include <sys/types.h>
 #include <unistd.h>
 
-#include <sys/types.h>
-#include <sys/stat.h>
-
 #define FUSE_USE_VERSION 26
-
 #include <fuse.h>
 
+#include "array.h"
 #include "lionfs.h"
 #include "network.h"
-#include "array.h"
+#include "vmutex.h"
 
 #define file_count (array_object_get_last((Array) files) + 1)
 
 lionfile_t **files;
+vmutex_t lockobj;
 
 static lionfile_t*
-get_file_by_path(const char *path)
-{
-	int i;
+get_file_by_path (const char *path) {
+	unsigned int i;
 
-	for(i = 0; i < file_count; i++)
-	{
+	for (i = 0; i < file_count; i++)
 		if(strcmp(path, files[i]->path) == 0)
 			return files[i];
-	}
 
 	return NULL;
 }
 
 static lionfile_t*
-get_file_by_ff(const char *path)
-{
-	if(strncmp(path, "/.ff/", 5) == 0)
-	{
+get_file_by_ff (const char *path) {
+	if (strncmp(path, "/.ff/", 5) == 0) {
 		path += 4;
 		return get_file_by_path(path);
 	}
@@ -64,100 +59,128 @@ get_file_by_ff(const char *path)
 	return NULL;
 }
 
+
 // ================
 // Fuse operations:
 // ================
 
 static int
-lion_getattr(const char *path, struct stat *buf)
-{
+lion_getattr (const char *path, struct stat *buf) {
 	lionfile_t *file;
 
 	memset(buf, 0, sizeof(struct stat));
 
-	if(strcmp(path, "/") == 0)
-	{
+	if (strcmp(path, "/") == 0) {
 		buf->st_mode = S_IFDIR | 0775;
 		buf->st_nlink = 2;
 		return 0;
 	}
 
-	if(strcmp(path, "/.ff") == 0)
-	{
+	if (strcmp(path, "/.ff") == 0) {
+		/* fakefiles directory is read-only */
 		buf->st_mode = S_IFDIR | 0444;
 		buf->st_nlink = 0;
 		return 0;
 	}
 
-	if((file = get_file_by_ff(path)) != NULL)
-	{
+	vmutex_increment(&lockobj);
+
+	if ((file = get_file_by_ff(path)) != NULL) {
+		/* It's a fakefile! */
+
 		buf->st_mode = S_IFREG | 0444;
-		buf->st_size = file->size;
 		buf->st_mtime = file->mtime;
 		buf->st_nlink = 0;
+		buf->st_size = file->size;
+
+		vmutex_decrement(&lockobj);
 		return 0;
 	}
 
-	if((file = get_file_by_path(path)) == NULL)
+	if ((file = get_file_by_path(path)) == NULL) {
+		vmutex_decrement(&lockobj);
 		return -ENOENT;
+	}
 
 	buf->st_mode = file->mode;
 	buf->st_size = file->size;
 	buf->st_mtime = file->mtime;
 	buf->st_nlink = 1;
 
+	vmutex_decrement(&lockobj);
+
 	return 0;
 }
 
 static int
-lion_readlink(const char *path, char *buf, size_t len)
-{
+lion_readlink (const char *path, char *buf, size_t len) {
 	lionfile_t *file;
 
-	if((file = get_file_by_path(path)) == NULL)
+	vmutex_increment(&lockobj);
+
+	if ((file = get_file_by_path(path)) == NULL) {
+		vmutex_decrement(&lockobj);
 		return -ENOENT;
+	}
 
 	snprintf(buf, len, ".ff/%s", file->path + 1);
 
+	vmutex_decrement(&lockobj);
+
 	return 0;
 }
 
 static int
-lion_unlink(const char *path)
-{
+lion_unlink (const char *path) {
 	lionfile_t *file;
 
-	if((file = get_file_by_path(path)) == NULL)
+	vmutex_acquire(&lockobj);
+
+	if ((file = get_file_by_path(path)) == NULL) {
+		vmutex_release(&lockobj);
 		return -ENOENT;
+	}
 
 	array_object_unlink((Array) files, file);
 
+	vmutex_release(&lockobj);
+
 	free(file->path);
 	free(file->url);
-
 	array_object_free(file);
 
 	return 0;
 }
 
 static int
-lion_symlink(const char *url, const char *path)
-{
+lion_symlink (const char *url, const char *path) {
+	lionfile_t network_file;
 	lionfile_t *file;
 
-	if(file_count == MAX_FILES)
-		return -ENOMEM;
-
-	if(get_file_by_path(path) != NULL)
-		return -EEXIST;
-
-	if(network_file_get_valid((char*) url))
+	/* Check if URL exists and get its info */
+	if (network_file_get_valid((char*) url))
 		return -EHOSTUNREACH;
+	if (network_file_get_info((char*) url, &network_file))
+		return -EHOSTUNREACH;
+
+	vmutex_acquire(&lockobj);
+
+	if (file_count == MAX_FILES) {
+		vmutex_release(&lockobj);
+		return -ENOMEM;
+	}
+
+	if (get_file_by_path(path) != NULL) {
+		vmutex_release(&lockobj);
+		return -EEXIST;
+	}
 
 	file = array_object_alloc(sizeof(lionfile_t));
 
-	if(file == NULL)
+	if (file == NULL) {
+		vmutex_release(&lockobj);
 		return -ENOMEM;
+	}
 
 	file->path = malloc(strlen(path) + 1);
 	file->url = malloc(strlen(url) + 1);
@@ -167,79 +190,102 @@ lion_symlink(const char *url, const char *path)
 
 	file->mode = S_IFLNK | 0444;
 
-	network_file_get_info(file->url, file);
+	/* TODO do not use `network_file`
+	 * replace it with a lionfileinfo_t structure (for example) */
+	file->size = network_file.size;
+	file->mtime = network_file.mtime;
 
 	array_object_link((Array) files, file);
+
+	vmutex_release(&lockobj);
 
 	return 0;
 }
 
 static int
-lion_rename(const char *oldpath, const char *newpath)
-{
+lion_rename (const char *oldpath, const char *newpath) {
 	lionfile_t *file;
 	char **path_pointer;
 	size_t newsize;
 
-	if((file = get_file_by_path(oldpath)) == NULL)
-		return -ENOENT;
+	vmutex_acquire(&lockobj);
 
-	if(get_file_by_path(newpath) != NULL)
+	if (get_file_by_path(newpath) != NULL) {
+		vmutex_release(&lockobj);
 		return -EEXIST;
+	}
+	if ((file = get_file_by_path(oldpath)) == NULL) {
+		vmutex_release(&lockobj);
+		return -ENOENT;
+	}
 
 	path_pointer = &file->path;
 	newsize = strlen(newpath) + 1;
 
-	if(newsize == 1)
+	if (newsize == 1) {
+		vmutex_release(&lockobj);
 		return -EINVAL;
+	}
 
 	*path_pointer = realloc(*path_pointer, newsize);
 
 	memcpy(*path_pointer, newpath, newsize);
 
+	vmutex_release(&lockobj);
+
 	return 0;
 }
 
 static int
-lion_read(const char *path, char *buf, size_t size, off_t off,
-	struct fuse_file_info *fi)
-{
+lion_read (const char *path, char *buf, size_t size, off_t off,
+	struct fuse_file_info *fi) {
 	lionfile_t *file;
+	size_t ret = 0;
 
-	if((file = get_file_by_ff(path)) == NULL)
+	vmutex_increment(&lockobj);
+
+	if ((file = get_file_by_ff(path)) == NULL) {
+		vmutex_decrement(&lockobj);
 		return -ENOENT;
+	}
 
-	if(off < file->size)
-	{
+	if (off < file->size) {
 		if(off + size > file->size)
 			size = file->size - off;
-	}
-	else
+	} else {
+		vmutex_decrement(&lockobj);
 		return 0;
+	}
 
-	return network_file_get_data(file->url, size, off, buf);
+	ret = network_file_get_data(file->url, size, off, buf);
+
+	vmutex_decrement(&lockobj);
+
+	return ret;
 }
 
 static int
-lion_readdir(const char *path, void *buf, fuse_fill_dir_t filler, off_t off,
-	struct fuse_file_info *fi)
-{
+lion_readdir (const char *path, void *buf, fuse_fill_dir_t filler, off_t off,
+	struct fuse_file_info *fi) {
 	int i;
 
-	if(strcmp(path, "/") != 0)
+	if (strcmp(path, "/") != 0)
 		return -ENOENT;
 
 	filler(buf, ".", NULL, 0);
 	filler(buf, "..", NULL, 0);
 
-	for(i = 0; i < file_count; i++)
+	vmutex_increment(&lockobj);
+
+	for (i = 0; i < file_count; i++)
 		filler(buf, files[i]->path + 1, NULL, 0);
+
+	vmutex_decrement(&lockobj);
 
 	return 0;
 }
 
-static struct fuse_operations fuseopr =
-{
+static struct fuse_operations fuseopr = {
 	.getattr = lion_getattr,
 	.readlink = lion_readlink,
 	.unlink = lion_unlink,
@@ -250,11 +296,13 @@ static struct fuse_operations fuseopr =
 };
 
 int
-main(int argc, char **argv)
-{
+main (int argc, char **argv) {
 	// Create files array.
-	if((files = (lionfile_t**) array_new(MAX_FILES)) == NULL)
+	if ((files = (lionfile_t**) array_new(MAX_FILES)) == NULL)
 		return 1;
+
+	// Init vmutex
+	vmutex_init(&lockobj);
 
 	// Init network
 	network_init();
@@ -267,6 +315,9 @@ main(int argc, char **argv)
 
 	// Close all network modules.
 	network_close_all_modules();
+
+	// Destroy vmutex
+	vmutex_destroy(&lockobj);
 
 	// Delete files array.
 	array_del((Array) files);

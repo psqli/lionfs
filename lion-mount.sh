@@ -82,9 +82,9 @@ fi
 mount_point="$1"
 
 # Options used by default:
-# `-s` = single-thread operation.
+# `-s` = single-thread operation. (deprecated)
 # `-o fsname` = Name of filesystem.
 # `-o use_ino` = Allow filesystem set its own inode numbers.
-default_opt="-s -o fsname=lionfs -o use_ino"
+default_opt="-o fsname=lionfs -o use_ino"
 
 ./lionfs $mount_point $opt_arg $default_opt
