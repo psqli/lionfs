@@ -82,43 +82,6 @@ _go_request_destroy:
 }
 
 /**
- * get_length() Return the length of a file pointed by URI.
- *
- * @p uri 'http://' URI to a file over network.
- */
-long long
-get_length(char *uri)
-{
-	ghttp_request *ghr;
-
-	long long ret = 0;
-
-	ghr = ghttp_request_new();
-
-	if(ghttp_set_uri(ghr, uri) == -1)
-		goto _go_request_destroy;
-
-	ghttp_set_type(ghr, ghttp_type_head);
-
-	ghttp_set_sync(ghr, ghttp_sync);
-
-	ghttp_prepare(ghr);
-
-	if(ghttp_process(ghr) != ghttp_done)
-		goto _go_request_destroy;
-
-	if(ghttp_status_code(ghr) != 200)
-		goto _go_request_destroy;
-
-	ret = atoll(ghttp_get_header(ghr, "Content-Length"));
-
-_go_request_destroy:
-	ghttp_request_destroy(ghr);
-
-	return ret;
-}
-
-/**
  * get_valid() Validate an URI and check if it support range requests. Return 0
  * if OK or 1 if FAILED.
  *
@@ -167,7 +130,7 @@ _go_request_destroy:
 }
 
 int
-get_info(_info_t *info, char *uri)
+get_info(lionfile_info_t *info, char *uri)
 {
 	ghttp_request *ghr;
 

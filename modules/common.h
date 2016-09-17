@@ -17,8 +17,9 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
-typedef struct
-{
+#include <sys/time.h>
+
+typedef struct {
 	long long size;
 	time_t mtime;
-} _info_t;
+} lionfile_info_t;

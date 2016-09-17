@@ -31,6 +31,7 @@
 
 #include "array.h"
 #include "lionfs.h"
+#include "modules/common.h"
 #include "network.h"
 
 #define file_count (array_object_get_last((Array) files) + 1)
@@ -166,13 +167,13 @@ lion_unlink (const char *path) {
 
 static int
 lion_symlink (const char *url, const char *path) {
-	lionfile_t network_file;
+	lionfile_info_t file_info;
 	lionfile_t *file;
 
 	/* check if URL exists and get its info */
 	if (network_file_get_valid((char*) url))
 		return -EHOSTUNREACH;
-	if (network_file_get_info((char*) url, &network_file))
+	if (network_file_get_info((char*) url, &file_info))
 		return -EHOSTUNREACH;
 
 	pthread_rwlock_wrlock(&rwlock); /* write lock */
@@ -205,10 +206,8 @@ lion_symlink (const char *url, const char *path) {
 	/* symlinks are read-only :-) -- fakefiles copy this */
 	file->mode = 0444;
 
-	/* TODO do not use `network_file`
-	 * replace it with a lionfileinfo_t structure (for example) */
-	file->size = network_file.size;
-	file->mtime = network_file.mtime;
+	file->size = file_info.size;
+	file->mtime = file_info.mtime;
 
 	array_object_link((Array) files, file);
 

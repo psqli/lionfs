@@ -17,20 +17,14 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
-/* *_file_get functions
- * These functions get something from a file */
-
 size_t
 network_file_get_data(char*, size_t, long long, void*);
-
-long long
-network_file_get_length(char*);
 
 int
 network_file_get_valid(char*);
 
 int
-network_file_get_info(char*, lionfile_t*);
+network_file_get_info(char*, lionfile_info_t*);
 
 /* General network functions */
 
