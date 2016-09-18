@@ -17,14 +17,15 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
+#include <assert.h>
 #include <dlfcn.h>
+#include <stdio.h>
 #include <string.h>
 
 #include "modules/common.h"
 
 struct nmodule {
 	const char *name;
-	const char *path;
 	void *handle;
 
 	size_t
@@ -38,8 +39,8 @@ struct nmodule {
 };
 
 static struct nmodule modules[] = {
-	{ "http", "./modules/http", },
-	{ NULL, NULL, },
+	{ "http", },
+	{ NULL, },
 };
 
 static inline void
@@ -47,9 +48,9 @@ clean_pointers (struct nmodule *nm) {
 	/* Clean with zeroes all pointers to functions and the handle used for
 	 * dlopen().
 	 * We only get the address of handle and fill all the rest of
-	 * structure ( sizeof(struct nmodule) - 2 * sizeof(void*) ) with
+	 * structure ( sizeof(struct nmodule) - sizeof(void*) ) with
 	 * zeroes. */
-	memset(&nm->handle, 0, sizeof(struct nmodule) - 2 * sizeof(void*));
+	memset(&nm->handle, 0, sizeof(struct nmodule) - sizeof(void*));
 	return;
 }
 
@@ -80,16 +81,29 @@ close_module (struct nmodule *nm) {
 	return 0;
 }
 
+#define PATH_SIZE 4096
+
 static int
 open_module (struct nmodule *nm) {
+	assert(nm != NULL);
+
+	char tmp_path[PATH_SIZE];
+
 	if (nm->handle)
+		/* module was already opened or user didn't call
+		 * network_init() function */
 		return -1;
 
-	if ((nm->handle = dlopen(nm->path, RTLD_NOW)) == NULL)
-		return -1;
+	/* try to open module */
+	snprintf(tmp_path, PATH_SIZE, "lionfs/modules/%s\0", nm->name);
+	if ((nm->handle = dlopen(tmp_path, RTLD_NOW)) == NULL) {
+		snprintf(tmp_path, PATH_SIZE, "./modules/%s\0", nm->name);
+		if ((nm->handle = dlopen(tmp_path, RTLD_NOW)) == NULL)
+			return -1;
+	}
 
 	if (load_syms(nm) == -1) {
-		close_module(nm); /* We've already opened the module */
+		close_module(nm); /* we've already opened the module */
 		return -1;
 	}
 }
@@ -98,10 +112,9 @@ static struct nmodule*
 find_module_by_name (const char *name) {
 	int i;
 
-	for (i = 0; modules[i].name; i++) {
+	for (i = 0; modules[i].name; i++)
 		if(strcmp(modules[i].name, name) == 0)
 			return &modules[i];
-	}
 
 	return NULL;
 }
