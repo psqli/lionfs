@@ -43,9 +43,8 @@ called `lion-mount.sh` which is found in the source directory too. Use
 `lion-mount.sh --help` for more details.
 
 NOTE: At the moment we don't have an install script and then you need to execute
-the program in the source directory. HTTP module is default searched in
-`./modules/http` defined in `network.c`, if you want to put it in another
-directory change this location.
+the program in the source directory. Modules are default searched in
+`./modules/` or `<ld_library_paths>/lionfs/modules/` directories.
 
 	Supported protocols:
 
