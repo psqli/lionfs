@@ -59,7 +59,7 @@ NOTE: At the moment we don't have an install script and then you need to execute
 <br>
 the program in the source directory. Modules are default searched in
 <br>
-*./modules/* or *<ld_library_paths>/lionfs/modules/* directories.
+*./modules/* or *\<ld_library_paths\>/lionfs/modules/* directories.
 
 ## Supported protocols:
 
