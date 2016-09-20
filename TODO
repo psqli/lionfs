@@ -1,2 +1,1 @@
-* remove network_file_get_data() from write lock range
 * use a linked list instead of array
