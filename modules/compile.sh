@@ -3,6 +3,6 @@ xdir="`dirname $0`"
 
 cd $xdir
 
-cc -shared -o http http.c ../lib/libghttp/libghttp
+gcc -shared -fPIC -o http    http.c ../lib/libghttp/libghttp
 
 cd $cwd

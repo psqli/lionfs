@@ -1,6 +1,6 @@
 /*
  * lionfs, The Link Over Network File System
- * Copyright (C) 2016  Ricardo Biehl Pasquali <rbpoficial@gmail.com>
+ * Copyright (C) 2016,2017  Ricardo Biehl Pasquali <rbpoficial@gmail.com>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -17,14 +17,21 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
+#include <pthread.h>
 #include <sys/types.h>
 
-typedef struct {
+#include "linked_list.h"
+
+typedef struct
+{
+	struct list_head list_entry;
+	pthread_rwlock_t lock;
+	/*
+	 * to modify `path` you need list and file write-locks held
+	 */
 	char *path;
 	char *url;
 	long long size;
 	mode_t mode;
 	time_t mtime; /* Last Modified */
 } lionfile_t;
-
-#define MAX_FILES 64
