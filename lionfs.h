@@ -19,8 +19,7 @@
 
 #include <sys/types.h>
 
-typedef struct
-{
+typedef struct {
 	char *path;
 	char *url;
 	long long size;

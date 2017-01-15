@@ -40,18 +40,20 @@ lionfile_t **files;
 pthread_rwlock_t rwlock;
 
 static lionfile_t*
-get_file_by_path (const char *path) {
+get_file_by_path(const char *path)
+{
 	unsigned int i;
 
 	for (i = 0; i < file_count; i++)
-		if(strcmp(path, files[i]->path) == 0)
+		if (strcmp(path, files[i]->path) == 0)
 			return files[i];
 
 	return NULL;
 }
 
 static lionfile_t*
-get_file_by_ff (const char *path) {
+get_file_by_ff(const char *path)
+{
 	if (strncmp(path, "/.ff/", 5) == 0) {
 		path += 4;
 		return get_file_by_path(path);
@@ -73,7 +75,8 @@ get_file_by_ff (const char *path) {
 // ================
 
 static int
-lion_getattr (const char *path, struct stat *buf) {
+lion_getattr(const char *path, struct stat *buf)
+{
 	lionfile_t *file;
 
 	memset(buf, 0, sizeof(struct stat));
@@ -124,7 +127,8 @@ lion_getattr (const char *path, struct stat *buf) {
 }
 
 static int
-lion_readlink (const char *path, char *buf, size_t len) {
+lion_readlink(const char *path, char *buf, size_t len)
+{
 	lionfile_t *file;
 
 	pthread_rwlock_rdlock(&rwlock); /* read lock */
@@ -143,7 +147,8 @@ lion_readlink (const char *path, char *buf, size_t len) {
 }
 
 static int
-lion_unlink (const char *path) {
+lion_unlink(const char *path)
+{
 	lionfile_t *file;
 
 	pthread_rwlock_wrlock(&rwlock); /* write lock */
@@ -166,7 +171,8 @@ lion_unlink (const char *path) {
 }
 
 static int
-lion_symlink (const char *url, const char *path) {
+lion_symlink(const char *url, const char *path)
+{
 	lionfile_info_t file_info;
 	lionfile_t *file;
 
@@ -217,7 +223,8 @@ lion_symlink (const char *url, const char *path) {
 }
 
 static int
-lion_rename (const char *oldpath, const char *newpath) {
+lion_rename(const char *oldpath, const char *newpath)
+{
 	lionfile_t *file;
 	char **path_pointer;
 	size_t newsize;
@@ -253,8 +260,9 @@ lion_rename (const char *oldpath, const char *newpath) {
 }
 
 static int
-lion_read (const char *path, char *buf, size_t size, off_t off,
-	struct fuse_file_info *fi) {
+lion_read(const char *path, char *buf, size_t size, off_t off,
+	  struct fuse_file_info *fi)
+{
 	lionfile_t *file;
 	size_t ret = 0;
 
@@ -282,8 +290,9 @@ lion_read (const char *path, char *buf, size_t size, off_t off,
 }
 
 static int
-lion_readdir (const char *path, void *buf, fuse_fill_dir_t filler, off_t off,
-	struct fuse_file_info *fi) {
+lion_readdir(const char *path, void *buf, fuse_fill_dir_t filler, off_t off,
+	     struct fuse_file_info *fi)
+{
 	int i;
 
 	/* doesn't path equals "/" */
@@ -314,11 +323,12 @@ static struct fuse_operations fuseopr = {
 };
 
 int
-main (int argc, char **argv) {
+main(int argc, char **argv)
+{
 	int ret = 0;
 
 	// init rwlock
-	if(pthread_rwlock_init(&rwlock, NULL))
+	if (pthread_rwlock_init(&rwlock, NULL))
 		return 1;
 
 	// create files array.

@@ -44,7 +44,8 @@ static struct nmodule modules[] = {
 };
 
 static inline void
-clean_pointers (struct nmodule *nm) {
+clean_pointers(struct nmodule *nm)
+{
 	/* Clean with zeroes all pointers to functions and the handle used for
 	 * dlopen().
 	 * We only get the address of handle and fill all the rest of
@@ -55,7 +56,8 @@ clean_pointers (struct nmodule *nm) {
 }
 
 static int
-load_syms (struct nmodule *nm) {
+load_syms(struct nmodule *nm)
+{
 	if ((nm->func_get_data = dlsym(nm->handle, "get_data")) == NULL)
 		return -1;
 
@@ -69,7 +71,8 @@ load_syms (struct nmodule *nm) {
 }
 
 static int
-close_module (struct nmodule *nm) {
+close_module(struct nmodule *nm)
+{
 	if (!nm->handle)
 		return -1;
 
@@ -84,7 +87,8 @@ close_module (struct nmodule *nm) {
 #define PATH_SIZE 4096
 
 static int
-open_module (struct nmodule *nm) {
+open_module(struct nmodule *nm)
+{
 	assert(nm != NULL);
 
 	char tmp_path[PATH_SIZE];
@@ -109,7 +113,8 @@ open_module (struct nmodule *nm) {
 }
 
 static struct nmodule*
-find_module_by_name (const char *name) {
+find_module_by_name(const char *name)
+{
 	int i;
 
 	for (i = 0; modules[i].name; i++)
@@ -124,7 +129,8 @@ find_module_by_name (const char *name) {
 #define SCHEME_SIZE 8
 
 static struct nmodule*
-find_module_by_url (const char *url) {
+find_module_by_url(const char *url)
+{
 	int i;
 	char scheme[SCHEME_SIZE];
 
@@ -140,7 +146,8 @@ find_module_by_url (const char *url) {
 }
 
 size_t
-network_file_get_data (char *url, size_t size, long long off, void *data) {
+network_file_get_data(char *url, size_t size, long long off, void *data)
+{
 	struct nmodule *nm;
 
 	if ((nm = find_module_by_url(url)) == NULL)
@@ -153,7 +160,8 @@ network_file_get_data (char *url, size_t size, long long off, void *data) {
 }
 
 int
-network_file_get_valid (char *url) {
+network_file_get_valid(char *url)
+{
 	struct nmodule *nm;
 
 	if ((nm = find_module_by_url(url)) == NULL)
@@ -166,7 +174,8 @@ network_file_get_valid (char *url) {
 }
 
 int
-network_file_get_info (char *url, lionfile_info_t *file_info) {
+network_file_get_info(char *url, lionfile_info_t *file_info)
+{
 	struct nmodule *nm;
 
 	memset((void*) file_info, 0, sizeof(lionfile_info_t));
@@ -184,7 +193,8 @@ network_file_get_info (char *url, lionfile_info_t *file_info) {
 }
 
 int
-network_open_module (const char *name) {
+network_open_module(const char *name)
+{
 	struct nmodule *nm;
 
 	if ((nm = find_module_by_name(name)) == NULL)
@@ -194,7 +204,8 @@ network_open_module (const char *name) {
 }
 
 void
-network_open_all_modules (void) {
+network_open_all_modules(void)
+{
 	int i;
 
 	for (i = 0; modules[i].name; i++)
@@ -204,7 +215,8 @@ network_open_all_modules (void) {
 }
 
 int
-network_close_module (const char *name) {
+network_close_module(const char *name)
+{
 	struct nmodule *nm;
 
 	if((nm = find_module_by_name(name)) == NULL)
@@ -214,7 +226,7 @@ network_close_module (const char *name) {
 }
 
 void
-network_close_all_modules (void)
+network_close_all_modules(void)
 {
 	int i;
 
@@ -226,7 +238,7 @@ network_close_all_modules (void)
 
 /* Before all, we should call this function! */
 void
-network_init (void)
+network_init(void)
 {
 	int i;
 
