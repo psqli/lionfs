@@ -1,6 +1,5 @@
-Based on GhostFS https://github.com/raphaelsc/ghostfs by Raphael S. Carvalho
-<br>
-I'm very graceful :-)
+Based on GhostFS https://github.com/raphaelsc/ghostfs by Raphael S.
+Carvalho. I'm sincerely grateful for his help.
 
 ### The Lion ...
 ```
