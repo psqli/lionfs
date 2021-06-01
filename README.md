@@ -67,9 +67,5 @@ Only **HTTP**
 ----------
 
 Any contribution is welcome :-)
-<br>
-Any question mail me at <rbpoficial@gmail.com>
-<br>
-Any orthographic error ... Sorry by my English, it is not perfect :-(
 
-Cheers!
+Any question mail me at pasqualirb at gmail dot com
