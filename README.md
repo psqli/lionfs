@@ -17,10 +17,7 @@ Carvalho. I'm sincerely grateful for his help.
 ## What is it?
 
 Use something like `ln -s http://website/file.ext local_file` and you will
-have a local file that points to a network file. It is the purpose.  See
-the image:
-
-![lionfs-example.png](https://ricardobiehl.github.io/images/lionfs-example.png)
+have a local file that points to a network file. It is the purpose.
 
 ## How it works?
 
