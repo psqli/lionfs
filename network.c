@@ -134,7 +134,7 @@ find_module_by_url(const char *url)
 	int i;
 	char scheme[SCHEME_SIZE];
 
-	for (i = 0; *url && i < SCHEME_SIZE; i++) {
+	for (i = 0; url[i] && i < SCHEME_SIZE; i++) {
 		scheme[i] = url[i];
 		if (url[i] == ':') {
 			scheme[i] = '\0';
