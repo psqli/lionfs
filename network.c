@@ -25,7 +25,8 @@
 #include "modules/common.h"
 
 struct nmodule {
-	const char *name;
+	const char *scheme;
+	const char *filename;
 	void *handle;
 
 	size_t
@@ -39,7 +40,8 @@ struct nmodule {
 };
 
 static struct nmodule modules[] = {
-	{ "http", },
+	{ "http",  "curl", },
+	{ "https", "curl", },
 	{ NULL, },
 };
 
@@ -113,12 +115,12 @@ open_module(struct nmodule *nm)
 }
 
 static struct nmodule*
-find_module_by_name(const char *name)
+find_module_by_scheme(const char *scheme)
 {
 	int i;
 
-	for (i = 0; modules[i].name; i++)
-		if(strcmp(modules[i].name, name) == 0)
+	for (i = 0; modules[i].scheme; i++)
+		if(strcmp(modules[i].scheme, scheme) == 0)
 			return &modules[i];
 
 	return NULL;
@@ -138,7 +140,7 @@ find_module_by_url(const char *url)
 		scheme[i] = url[i];
 		if (url[i] == ':') {
 			scheme[i] = '\0';
-			return find_module_by_name(scheme);
+			return find_module_by_scheme(scheme);
 		}
 	}
 
@@ -197,7 +199,7 @@ network_open_module(const char *name)
 {
 	struct nmodule *nm;
 
-	if ((nm = find_module_by_name(name)) == NULL)
+	if ((nm = find_module_by_scheme(name)) == NULL)
 		return -1;
 
 	return open_module(nm);
@@ -208,7 +210,7 @@ network_open_all_modules(void)
 {
 	int i;
 
-	for (i = 0; modules[i].name; i++)
+	for (i = 0; modules[i].scheme; i++)
 		open_module(&modules[i]);
 
 	return;
@@ -219,7 +221,7 @@ network_close_module(const char *name)
 {
 	struct nmodule *nm;
 
-	if((nm = find_module_by_name(name)) == NULL)
+	if((nm = find_module_by_scheme(name)) == NULL)
 		return -1;
 
 	return close_module(nm);
@@ -230,7 +232,7 @@ network_close_all_modules(void)
 {
 	int i;
 
-	for (i = 0; modules[i].name; i++)
+	for (i = 0; modules[i].scheme; i++)
 		close_module(&modules[i]);
 
 	return;
@@ -242,6 +244,6 @@ network_init(void)
 {
 	int i;
 
-	for (i = 0; modules[i].name; i++)
+	for (i = 0; modules[i].scheme; i++)
 		clean_pointers(&modules[i]);
 }
