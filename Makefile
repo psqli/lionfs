@@ -10,8 +10,7 @@ all: modules lionfs
 modules:
 	cd modules && $(MAKE) all
 
-lionfs: lionfs.o network.o array.o
+lionfs: lionfs.o network.o
 
 lionfs.o: lionfs.c lionfs.h
 network.o: network.c network.h
-array.o: array.c array.h
