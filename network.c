@@ -101,9 +101,9 @@ open_module(struct nmodule *nm)
 		return -1;
 
 	/* try to open module */
-	snprintf(tmp_path, PATH_SIZE, "lionfs/modules/%s\0", nm->name);
+	snprintf(tmp_path, PATH_SIZE, "lionfs/modules/%s", nm->filename);
 	if ((nm->handle = dlopen(tmp_path, RTLD_NOW)) == NULL) {
-		snprintf(tmp_path, PATH_SIZE, "./modules/%s\0", nm->name);
+		snprintf(tmp_path, PATH_SIZE, "./modules/%s", nm->filename);
 		if ((nm->handle = dlopen(tmp_path, RTLD_NOW)) == NULL)
 			return -1;
 	}
