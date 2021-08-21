@@ -1,4 +1,4 @@
-CFLAGS = -rdynamic -fPIC
+CFLAGS = -rdynamic -fPIC -ggdb
 
 LDLIBS = -lcurl
 LDFLAGS = -shared
