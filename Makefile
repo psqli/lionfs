@@ -5,9 +5,9 @@ CFLAGS= -D_FILE_OFFSET_BITS=64 -ggdb
 LDFLAGS = -fPIC
 LDLIBS = -lfuse -ldl -lpthread
 
-all: modules lionfs
+all: build_modules lionfs
 
-modules:
+build_modules:
 	cd modules && $(MAKE) all
 
 lionfs: lionfs.o network.o
