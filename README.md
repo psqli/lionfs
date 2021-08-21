@@ -1,7 +1,8 @@
 Based on GhostFS https://github.com/raphaelsc/ghostfs by Raphael S.
 Carvalho. I'm sincerely grateful for his help.
 
-### The Lion ...
+# The Lion
+
 ```
        #######
       ###   ###
@@ -13,43 +14,44 @@ Carvalho. I'm sincerely grateful for his help.
 ._._._._##._.##_._##._.##_._._._._._
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 ```
+
 # lionfs (Link Over Network File System)
 
 ## What is it?
 
-Use something like `ln -s http://website/file.ext local_file` and you will
-have a local file that points to a network file. It is the purpose.
+This is a small proof-of-concept of a file system which allows creating
+symbolic links to remote files that are accessible with an URI.
 
 ## How it works?
 
-Basically we do the background when you call the *read()* operation in a
-symlink created by lionfs and fill the data with the content received over
-a http request to the host. We don't have cache.
+This program uses an interface of the Linux Kernel for intercepting file
+system operations on a given directory (the mount point). It replaces the
+original operations (e.g. symlink(), read()) with its own. When user reads
+a file, for example, a request is sent to the network resource and the
+response is returned to the user.
 
-## How do I install it?
+## How to build it?
 
-First you will need **libfuse** library, which probably is already present
-in your system.
+Dependencies: `libcurl` and `libfuse` libraries.
 
-NOTE: Currently we aren't using *make* because I don't known how to
-implement it and I'm with RSI (pt-br LER), typing with only one hand.
+After installing the dependencies, run:
 
-Later you simply type `./compile-all.sh` in source directory and if all
-goes right a binary called **lionfs** will be created. See next!
+`make`
 
 ## How do I use it?
 
-You will not execute the binary directly, instead you will execute a script
-called `lion-mount.sh` which is found in the source directory too. Use
-`lion-mount.sh --help` for more details.
+1. Mount the lionfs file system on an empty directory:
+   `./lion-mount.sh example_directory`
+2. Create a symbolic link to a network resource:
+   `ln -s https://www.example.com/file local_file`
 
-NOTE: At the moment we don't have an install script and then you need to
-execute the program in the source directory. Modules are default searched
-in *./modules/* or *\<ld_library_paths\>/lionfs/modules/* directories.
+NOTE: At the moment there is no install script. The program needs to be
+executed in the source directory. Modules are default searched in
+`./modules/` or `<ld_library_paths>/lionfs/modules/` directories.
 
 ## Supported protocols:
 
-Only **HTTP**
+See cURL's list of supported protocols.
 
 ----------
 
