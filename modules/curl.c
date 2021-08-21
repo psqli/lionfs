@@ -9,6 +9,24 @@
 
 #include "common.h"
 
+static int is_curl_initialized = 0;
+static void
+ensure_curl_initialized()
+{
+	if (!is_curl_initialized) {
+		curl_global_init(CURL_GLOBAL_DEFAULT);
+		is_curl_initialized = 1;
+	}
+}
+
+static size_t
+copy_helper(void *src, size_t size, size_t nmemb, void *dst)
+{
+	if (dst)
+		memcpy(dst, src, size * nmemb);
+	return size * nmemb;
+}
+
 /**
  * get_data() Read from a file pointed by URI over network.
  *
@@ -20,6 +38,8 @@
 size_t
 get_data(void *data, char *uri, long long off, size_t size)
 {
+	ensure_curl_initialized();
+
 	CURL *curl = curl_easy_init();
 	if (!curl)
 		return -1;
@@ -39,12 +59,11 @@ get_data(void *data, char *uri, long long off, size_t size)
 		goto error;
 
 	// Set the callback when request finishes
-	size_t tmp(void *src, size_t size, size_t nmemb, void *dst) { memcpy(dst, src, size * nmemb); }
-	curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, tmp);
-	curl_easy_setopt(curl, CURLOPT_WRITEDATA, data); // passed as dst in the above memcpy()
+	curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, copy_helper);
+	curl_easy_setopt(curl, CURLOPT_WRITEDATA, data); // passed as dst in memcpy()
 
 	// Do the request
-	ret = curl_easy_perform(uri);
+	ret = curl_easy_perform(curl);
 	if (ret != CURLE_OK)
 		goto error;
 
@@ -66,12 +85,15 @@ error:
 int
 get_valid(char *uri)
 {
+	ensure_curl_initialized();
 	return 0;
 }
 
 int
 get_info(lionfile_info_t *info, char *uri)
 {
+	ensure_curl_initialized();
+
 	CURL *curl = curl_easy_init();
 	if (!curl)
 		return -1;
@@ -86,17 +108,15 @@ get_info(lionfile_info_t *info, char *uri)
 	// Set the option for returning size and last-mofified time
 	curl_easy_setopt(curl, CURLOPT_NOBODY, 1L);
 	curl_easy_setopt(curl, CURLOPT_FILETIME, 1L);
-	if (ret != CURLE_OK)
-		goto error;
 
 	// Do the request
-	ret = curl_easy_perform(uri);
+	ret = curl_easy_perform(curl);
 	if (ret != CURLE_OK)
 		goto error;
 
 	// Get file size
-	ret = curl_easy_getinfo(curl, CURLINFO_CONTENT_LENGTH_DOWNLOAD, &info->size);
-	if (ret != CURLE_OK)
+	ret = curl_easy_getinfo(curl, CURLINFO_CONTENT_LENGTH_DOWNLOAD_T, &info->size);
+	if (ret != CURLE_OK || info->size < 1)
 		goto error;
 
 	// Get file last-modified time
