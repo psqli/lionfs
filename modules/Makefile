@@ -1,5 +1,6 @@
 CFLAGS = -rdynamic -fPIC
 
+LDLIBS = -lcurl
 LDFLAGS = -shared
 
 all: curl.so
