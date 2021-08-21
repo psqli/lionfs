@@ -48,12 +48,9 @@ static struct nmodule modules[] = {
 static inline void
 clean_pointers(struct nmodule *nm)
 {
-	/* Clean with zeroes all pointers to functions and the handle used for
-	 * dlopen().
-	 * We only get the address of handle and fill all the rest of
-	 * structure ( sizeof(struct nmodule) - sizeof(void*) ) with
-	 * zeroes. */
-	memset(&nm->handle, 0, sizeof(struct nmodule) - sizeof(void*));
+	nm->func_get_data  = NULL;
+	nm->func_get_valid = NULL;
+	nm->func_get_info  = NULL;
 	return;
 }
 
